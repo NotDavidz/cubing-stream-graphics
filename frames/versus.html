@@ -9,6 +9,7 @@
 
   .side { padding: 28px; display: flex; flex-direction: column; gap: 20px; min-width: 0; }
   .side .head { display: flex; align-items: center; gap: 24px; }
+  .side .head > div:last-child { flex: 1; min-width: 0; }
   .side .name { font-size: 50px; font-weight: 800; line-height: 1.05; text-transform: uppercase; color: var(--y-gold); }
   .side .detail { font-size: 22px; font-weight: 500; color: var(--white); margin-top: 6px; }
   .side-b .head { flex-direction: row-reverse; text-align: right; }
@@ -67,7 +68,7 @@ function side(state, id, which) {
       `<div class="row"><span class="grow">${esc(k)}</span><span class="value">${esc(v)}</span></div>`).join("");
   }
   return `<div class="head">${avatar(e, 170, which)}
-      <div><div class="name">${esc(e.name)}</div><div class="detail">${esc(e.kind === "team" ? e.detail : "")}</div></div>
+      <div><div class="name" data-fit="wrap">${esc(e.name)}</div><div class="detail">${esc(e.kind === "team" ? e.detail : "")}</div></div>
     </div><div class="rows">${rows}</div>`;
 }
 
@@ -85,9 +86,9 @@ store.subscribe((state) => {
   paint("#centre", `
     <div class="label">Best of ${esc(m.bestOf || 1)}</div>
     <div class="scores">
-      <div class="score pop ${a > b ? "lead" : ""}" data-v="${a}">${a}</div>
+      <div class="score ${a > b ? "lead" : ""}" data-k="a" data-v="${a}">${a}</div>
       <div class="vs">VS</div>
-      <div class="score pop ${b > a ? "lead" : ""}" data-v="${b}">${b}</div>
+      <div class="score ${b > a ? "lead" : ""}" data-k="b" data-v="${b}">${b}</div>
     </div>
     <div class="pips"><div class="a">${pips(a, needed)}</div><div class="b">${pips(b, needed)}</div></div>`);
   paint(".infobar", eventInfobar(state));

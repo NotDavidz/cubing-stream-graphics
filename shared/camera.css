@@ -17,13 +17,15 @@
 /* The bulge: a tab growing out of the bottom edge of the frame. */
 .cam .bulge {
   position: absolute; left: 50%; bottom: 0; transform: translateX(-50%);
-  height: 62px; padding: 0 54px;
+  height: 62px; padding: 0 54px; max-width: calc(100% - 60px);
   background: var(--edge); color: var(--ink);
   clip-path: polygon(34px 0, calc(100% - 34px) 0, 100% 100%, 0 100%);
   display: flex; align-items: center; gap: 18px;
   font-size: 28px; font-weight: 800; text-transform: uppercase; white-space: nowrap;
   transition: background .25s;
 }
+.cam .bulge > * { flex: none; }
+.cam .bulge .what { flex: 0 1 auto; }
 .cam .bulge .puzzle { color: var(--ink); }
 .cam .bulge .num {
   background: var(--ink); color: var(--y-gold);
@@ -36,9 +38,13 @@
 /* Name plate in the top-left corner of the window. */
 .cam .plate {
   position: absolute; left: 8px; top: 8px;
-  display: flex; align-items: stretch; height: 58px;
+  display: flex; align-items: stretch; height: 58px; max-width: calc(100% - 440px);
   font-weight: 800; text-transform: uppercase; white-space: nowrap;
 }
+.cam .plate .nm { min-width: 0; }
+.cam .plate .nm span, .cam .plate .nm small { overflow: hidden; text-overflow: ellipsis; }
+.cam .plate .nm small { flex: none; max-width: 40%; }
+.cam .plate .time { flex: none; }
 .cam .plate .nm { background: var(--ink); color: var(--edge); padding: 0 20px; font-size: 30px; display: flex; align-items: center; gap: 14px; }
 .cam .plate .nm small { color: var(--white); font-size: 18px; letter-spacing: 2px; }
 .cam .plate .time { background: var(--edge); color: var(--ink); padding: 0 18px; font-size: 34px; display: flex; align-items: center; font-variant-numeric: tabular-nums; }
@@ -73,24 +79,28 @@
   padding: 0 16px; font-weight: 800; text-transform: uppercase; white-space: nowrap;
 }
 .scorebar .team { display: flex; align-items: center; gap: 16px; font-size: 40px; min-width: 0; overflow: hidden; }
-.scorebar .team.b { flex-direction: row-reverse; }
+.scorebar .team.b { flex-direction: row-reverse; text-align: right; }
+.scorebar .team span { flex: 1; }
 .scorebar .team .avatar { background: var(--ink); color: var(--y-gold); }
 .scorebar .num {
   width: 84px; height: 70px; background: var(--ink); color: var(--y-gold);
   display: flex; align-items: center; justify-content: center; font-size: 54px;
 }
 .scorebar .num.b { color: var(--y-pale); }
-.scorebar .mid { display: flex; align-items: center; gap: 14px; font-size: 20px; line-height: 1.15; letter-spacing: 1px; min-width: 190px; justify-content: center; }
+.scorebar .mid { display: flex; align-items: center; gap: 14px; font-size: 20px; line-height: 1.15; letter-spacing: 1px; min-width: 190px; max-width: 380px; justify-content: center; }
+.scorebar .mid > div { min-width: 0; }
+.scorebar .mid .puzzle { flex: none; }
 .scorebar .mid .puzzle { color: var(--ink); }
 
 /* ---------- Result plate under a camera (two-camera frame) ---------- */
 
 .result {
-  position: absolute; height: 78px; background: var(--panel);
+  position: absolute; height: 78px; background: var(--panel); overflow: hidden;
   display: flex; align-items: center; gap: 18px; padding: 0 20px 0 0;
   font-weight: 800; text-transform: uppercase; white-space: nowrap;
 }
 .result .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 34px; color: var(--y-gold); }
 .result.b .nm { color: var(--y-pale); }
-.result small { font-size: 18px; letter-spacing: 2px; color: var(--white); }
+.result small { font-size: 18px; letter-spacing: 2px; color: var(--white); flex: 0 1 auto; min-width: 0; max-width: 30%; overflow: hidden; text-overflow: ellipsis; }
+.result > * { flex: none; }
 .result .time { font-size: 46px; color: var(--white); font-variant-numeric: tabular-nums; }

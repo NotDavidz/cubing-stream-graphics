@@ -42,13 +42,40 @@ export function esc(value) {
 
 // Replace an element's contents only when they changed, so animations do not
 // restart every time some unrelated part of the state is edited.
+//
+// Inside the markup, give a value that should "pop" when it changes
+// data-k="a-name" data-v="its value". Only the values that really changed
+// animate; everything else redraws silently.
 export function paint(target, html) {
   const el = typeof target === "string" ? document.querySelector(target) : target;
-  if (el && el.__html !== html) {
-    el.innerHTML = html;
-    el.__html = html;
+  if (!el || el.__html === html) return;
+  const first = el.__html === undefined;
+  const before = new Map([...el.querySelectorAll("[data-k]")].map((n) => [n.dataset.k, n.dataset.v]));
+  el.innerHTML = html;
+  el.__html = html;
+  if (!first) {
+    for (const n of el.querySelectorAll("[data-k]")) {
+      if (before.get(n.dataset.k) !== n.dataset.v) n.classList.add("pop");
+    }
+  }
+  fit(el);
+}
+
+// Shrink text marked data-fit until it fits the width of its box.
+//   data-fit="line"  one line, never wraps
+//   data-fit="wrap"  may wrap; shrinks only if a single word is too long
+export function fit(root = document) {
+  for (const el of root.querySelectorAll("[data-fit]")) {
+    el.style.fontSize = "";
+    const base = parseFloat(getComputedStyle(el).fontSize);
+    let size = base;
+    while (el.scrollWidth > el.clientWidth + 1 && size > base * 0.4) {
+      size *= 0.95;
+      el.style.fontSize = `${size}px`;
+    }
   }
 }
+document.fonts?.ready.then(() => fit());   // measure again once Poppins has loaded
 
 // ---------- Looking things up in the state ----------
 
@@ -77,6 +104,11 @@ export function initials(name) {
   return String(name || "?").trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join("");
 }
 
+// A label for tight spaces: the tag, a short name as it is, else initials.
+export function shortName(thing) {
+  return thing.tag || (String(thing.name).length <= 12 ? thing.name : initials(thing.name));
+}
+
 // ---------- Markup ----------
 
 // Photos may be a full URL or a path inside this project ("assets/photos/x.jpg").
@@ -98,14 +130,14 @@ export function puzzle(id, size = 80, cls = "") {
 export function banner(title, subtitle = "") {
   return `<img class="logo" src="${LOGO}" alt="">
     <div class="strip"></div>
-    <div class="bar">${esc(title)}</div>
-    ${subtitle ? `<div class="subbar">${esc(subtitle)}</div>` : ""}`;
+    <div class="bar"><span data-fit="line">${esc(title)}</span></div>
+    ${subtitle ? `<div class="subbar"><span data-fit="line">${esc(subtitle)}</span></div>` : ""}`;
 }
 
 // Footer bar: big gold text | white rule | two small white lines.
 export function infobar(big, line1, line2) {
   return `<div class="row">
-      <div class="big">${esc(big)}</div>
+      <div class="big" data-fit="line">${esc(big)}</div>
       <div class="rule"></div>
       <div class="small"><b>${esc(line1)}</b>${esc(line2)}</div>
     </div>

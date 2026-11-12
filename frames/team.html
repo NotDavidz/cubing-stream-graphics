@@ -47,7 +47,7 @@ store.subscribe((state) => {
     const pb = m.events?.[m.mainEvent] || {};
     return `<section class="member panel rise" style="animation-delay:${0.08 * (i + 1)}s">
       ${avatar(m, 220)}
-      <h3>${esc(m.name)}</h3>
+      <h3 data-fit="wrap">${esc(m.name)}</h3>
       <div class="wca">${esc(m.wcaId || "")}</div>
       ${m.mainEvent ? `<div class="main">${puzzle(m.mainEvent, 54)}
         <div><span class="label">${esc(puzzleName(m.mainEvent, true))} avg</span><b>${esc(pb.average || "–")}</b></div></div>` : ""}
@@ -57,7 +57,7 @@ store.subscribe((state) => {
   paint("main", `
     <section class="team panel rise">
       ${avatar(e, 230)}
-      <div class="name">${esc(team.name)}</div>
+      <div class="name" data-fit="wrap">${esc(team.name)}</div>
       ${team.motto ? `<div class="motto">${esc(team.motto)}</div>` : ""}
       ${team.record ? `<div class="label">Record</div><div class="record">${esc(team.record)}</div>` : ""}
     </section>

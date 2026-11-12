@@ -106,7 +106,10 @@ export function puzzleName(id, short = false) {
 }
 
 // Returns an <svg> string. Size it with CSS on the wrapping .puzzle element.
+// Each icon is drawn once and reused: identical markup every time means a
+// frame can tell that nothing changed and leave its animations alone.
+const drawn = {};
 export function puzzleIcon(id) {
-  const p = PUZZLES[id] || PUZZLES["333"];
-  return `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${p.draw()}</svg>`;
+  const key = PUZZLES[id] ? id : "333";
+  return (drawn[key] ??= `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${PUZZLES[key].draw()}</svg>`);
 }

@@ -6,7 +6,8 @@
 <link rel="stylesheet" href="../shared/theme.css">
 <link rel="stylesheet" href="../shared/camera.css">
 <style>
-  .bug { position: absolute; left: 50%; top: 28px; width: 1180px; transform: translateX(-50%); }
+  /* Centred with left, not a transform: the entry animation owns transform. */
+  .bug { position: absolute; left: 370px; top: 28px; width: 1180px; }
   .bug.bottom { top: auto; bottom: 28px; }
   .bug .strip { height: 10px; background: var(--y-pale); margin-bottom: 8px; }
   .bug .scorebar { height: 76px; }

@@ -60,8 +60,8 @@ store.subscribe((state) => {
       ${avatar(who, 78, slot)}
       <span class="nm">${esc(who.name)}</span>
       ${who.team ? `<small>${esc(who.team)}</small>` : ""}
-      ${cam.time ? `<span class="time pop">${esc(cam.time)}</span>` : ""}
-      ${status.label ? `<span class="tag ${status.tone === "alert" ? "alert" : ""} pop" style="font-size:26px">${esc(status.label)}</span>` : ""}`);
+      ${cam.time ? `<span class="time" data-k="time" data-v="${esc(cam.time)}">${esc(cam.time)}</span>` : ""}
+      ${status.label ? `<span class="tag ${status.tone === "alert" ? "alert" : ""}" data-k="status" data-v="${esc(status.label)}" style="font-size:26px">${esc(status.label)}</span>` : ""}`);
   }
 });
 </script>

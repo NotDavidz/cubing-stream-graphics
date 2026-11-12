@@ -19,7 +19,7 @@
 </div>
 <script type="module">
 import { store } from "../shared/store.js";
-import { initStage, params, paint, esc, entity, puzzle, puzzleName } from "../shared/ui.js";
+import { initStage, params, paint, esc, entity, puzzle, puzzleName, shortName } from "../shared/ui.js";
 import { camInfo, camClass, burst } from "../shared/camera.js";
 
 initStage();
@@ -29,17 +29,17 @@ store.subscribe((state) => {
   const { cam, who } = camInfo(state, slot);
   const m = state.match || {}, e = state.event || {};
   const a = entity(state, m.a), b = entity(state, m.b);
-  const short = (x) => esc(x.tag || x.name);
+  const short = (x) => esc(shortName(x));
   const score = m.show !== false;
 
   document.querySelector("#cam").className = camClass(state, slot);
   paint("#plate", `
-    <div class="nm">${esc(who.name)}${who.team ? `<small>${esc(who.team)}</small>` : ""}</div>
-    ${cam.time ? `<div class="time pop">${esc(cam.time)}</div>` : ""}`);
+    <div class="nm"><span>${esc(who.name)}</span>${who.team ? `<small>${esc(who.team)}</small>` : ""}</div>
+    ${cam.time ? `<div class="time" data-k="time" data-v="${esc(cam.time)}">${esc(cam.time)}</div>` : ""}`);
   paint("#burst", burst(state, slot));
   paint("#bulge", `
     ${score ? `<span>${short(a)}</span><span class="num a">${esc(m.scoreA ?? 0)}</span><span class="sep"></span>` : ""}
-    ${puzzle(e.puzzle, 40)}<span>${esc([puzzleName(e.puzzle, true), e.round].filter(Boolean).join(" · "))}</span>
+    ${puzzle(e.puzzle, 40)}<span class="what" data-fit="line">${esc([puzzleName(e.puzzle, true), e.round].filter(Boolean).join(" · "))}</span>
     ${score ? `<span class="sep"></span><span class="num b">${esc(m.scoreB ?? 0)}</span><span>${short(b)}</span>` : ""}`);
 });
 </script>

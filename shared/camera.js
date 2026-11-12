@@ -36,11 +36,11 @@ export function scoreBar(state) {
   const a = entity(state, m.a), b = entity(state, m.b);
   const show = m.show !== false;
   return `
-    <div class="team a">${avatar(a, 62)}<span>${esc(a.name)}</span></div>
-    ${show ? `<div class="num a pop" data-v="${esc(m.scoreA)}">${esc(m.scoreA ?? 0)}</div>` : "<span></span>"}
-    <div class="mid">${puzzle(e.puzzle, 46)}<div>${esc(e.round || "")}<br>${esc(e.format || puzzleName(e.puzzle, true))}</div></div>
-    ${show ? `<div class="num b pop" data-v="${esc(m.scoreB)}">${esc(m.scoreB ?? 0)}</div>` : "<span></span>"}
-    <div class="team b">${avatar(b, 62)}<span>${esc(b.name)}</span></div>`;
+    <div class="team a">${avatar(a, 62)}<span data-fit="line">${esc(a.name)}</span></div>
+    ${show ? `<div class="num a" data-k="a" data-v="${esc(m.scoreA)}">${esc(m.scoreA ?? 0)}</div>` : "<span></span>"}
+    <div class="mid">${puzzle(e.puzzle, 46)}<div><span data-fit="line">${esc(e.round || "")}</span><span data-fit="line">${esc(e.format || puzzleName(e.puzzle, true))}</span></div></div>
+    ${show ? `<div class="num b" data-k="b" data-v="${esc(m.scoreB)}">${esc(m.scoreB ?? 0)}</div>` : "<span></span>"}
+    <div class="team b">${avatar(b, 62)}<span data-fit="line">${esc(b.name)}</span></div>`;
 }
 
 // The patterned backdrop with rectangular holes cut out for the cameras.

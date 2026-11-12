@@ -76,7 +76,7 @@ body.letterbox { background: #000; }   /* projected in a normal browser window *
 
 .banner { position: relative; padding-top: 118px; flex: none; z-index: 1; }
 .banner .logo {
-  position: absolute; left: 50%; top: 12px; height: 128px;
+  position: absolute; left: 50%; top: 8px; height: 134px;
   transform: translateX(-50%);
 }
 .banner .strip { height: 14px; background: var(--y-pale); margin-bottom: 10px; }
@@ -85,12 +85,12 @@ body.letterbox { background: #000; }   /* projected in a normal browser window *
   height: 92px; background: var(--y-gold); color: var(--ink);
   display: flex; align-items: center; justify-content: center;
   font-size: 70px; font-weight: 800; letter-spacing: 1px; line-height: 1;
-  text-transform: uppercase; white-space: nowrap;
+  text-transform: uppercase; white-space: nowrap; padding: 0 30px;
 }
 .banner .subbar {
   height: 50px; background: var(--y-deep); color: var(--white);
   display: flex; align-items: center; justify-content: center;
-  font-size: 30px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;
+  font-size: 30px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; padding: 0 30px;
 }
 
 main { flex: 1; min-height: 0; margin: 22px 0; position: relative; z-index: 1; }
@@ -100,14 +100,14 @@ main { flex: 1; min-height: 0; margin: 22px 0; position: relative; z-index: 1; }
 .infobar { flex: none; margin-bottom: 30px; z-index: 1; }
 .infobar .row {
   height: 78px; background: var(--panel);
-  display: flex; align-items: center; justify-content: center; gap: 34px;
+  display: flex; align-items: center; justify-content: center; gap: 34px; padding: 0 30px;
 }
 .infobar .big {
   color: var(--y-gold); font-size: 44px; font-weight: 800;
   text-transform: uppercase; white-space: nowrap;
 }
-.infobar .rule { width: 4px; height: 52px; background: var(--white); }
-.infobar .small { font-size: 22px; line-height: 1.25; text-transform: uppercase; white-space: nowrap; }
+.infobar .rule { width: 4px; height: 52px; background: var(--white); flex: none; }
+.infobar .small { flex: none; font-size: 22px; line-height: 1.25; text-transform: uppercase; white-space: nowrap; }
 .infobar .small b { display: block; font-weight: 800; letter-spacing: 1.5px; }
 .infobar .strip { height: 12px; background: var(--y-pale); }
 
@@ -122,6 +122,11 @@ main { flex: 1; min-height: 0; margin: 22px 0; position: relative; z-index: 1; }
 .gold { color: var(--y-gold); }
 .pale { color: var(--y-pale); }
 .upper { text-transform: uppercase; }
+
+/* Text that must stay inside its box: ui.js shrinks the font until it fits.
+   data-fit="line" stays on one line; data-fit="wrap" may wrap. */
+[data-fit] { display: block; min-width: 0; max-width: 100%; }
+[data-fit="line"] { white-space: nowrap; }
 
 /* Square avatar: a photo, or initials on gold when there is no photo. */
 .avatar {

@@ -17,6 +17,7 @@ const LOCAL_KEY = "uwcc-overlay-state";
 const listeners = new Set();
 let state = null;
 let online = false;
+let rev = -1;            // server revision of the state we hold
 let channel = null;
 
 function emit() {
@@ -88,12 +89,17 @@ async function start() {
   try {
     const res = await fetch(api("state"));
     if (!res.ok) throw new Error("no server");
-    state = (await res.json()).state;
+    ({ state, rev } = await res.json());
     online = true;
     // ?still=1 is a one-off snapshot (still exports), so no live connection.
     if (new URLSearchParams(location.search).has("still")) return emit();
     const events = new EventSource(api("events"));
-    events.onmessage = (e) => { state = JSON.parse(e.data).state; emit(); };
+    events.onmessage = (e) => {
+      const next = JSON.parse(e.data);
+      if (next.rev === rev) return;      // the copy sent on connect; already drawn
+      ({ state, rev } = next);
+      emit();
+    };
   } catch {
     const saved = localStorage.getItem(LOCAL_KEY);
     state = saved ? JSON.parse(saved) : await (await fetch(DEFAULTS)).json();

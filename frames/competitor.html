@@ -11,7 +11,8 @@
   .card .avatar { width: 100% !important; font-size: 130px !important; }
   .facts { display: flex; flex-direction: column; gap: 8px; }
   .fact { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; background: var(--panel-2); padding: 8px 14px; }
-  .fact b { font-size: 24px; font-weight: 700; white-space: nowrap; }
+  .fact .label { flex: none; }
+  .fact b { font-size: 24px; font-weight: 700; white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 
   .info { padding: 30px 34px; display: flex; flex-direction: column; gap: 22px; min-width: 0; }
   .name { font-size: 76px; font-weight: 800; line-height: 1; text-transform: uppercase; color: var(--y-gold); }
@@ -54,7 +55,7 @@ store.subscribe((state) => {
   const events = Object.entries(p.events || {}).map(([ev, t]) => `
     <div class="event ${ev === p.mainEvent ? "main" : ""}">
       ${puzzle(ev, 84)}
-      <div><h3>${esc(puzzleName(ev, true))}</h3>
+      <div style="min-width:0"><h3 data-fit="line">${esc(puzzleName(ev, true))}</h3>
         <div class="times">
           <span>Single<b>${esc(t.single || "–")}</b></span>
           <span>Average<b>${esc(t.average || "–")}</b></span>
@@ -64,7 +65,7 @@ store.subscribe((state) => {
   paint("main", `
     <section class="card panel rise">${avatar(e, 348)}<div class="facts">${facts}</div></section>
     <section class="info panel rise" style="animation-delay:.08s">
-      <div class="name">${esc(p.name)}</div>
+      <div class="name" data-fit="line">${esc(p.name)}</div>
       ${p.bio ? `<div class="bio">${esc(p.bio)}</div>` : ""}
       <div class="label">Personal bests</div>
       <div class="events">${events}</div>

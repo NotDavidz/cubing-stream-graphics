@@ -91,6 +91,10 @@ frame is a function from state to HTML, so nothing can get out of step.
 - **A new frame:** copy the closest file in `frames/`, change its render
   function, and add it to the lists in `frames/index.html`, `frames/program.html`
   and `control/control.js`.
+- **Text that might be too long for its box:** add `data-fit="line"` (one line)
+  or `data-fit="wrap"` to the element and it shrinks to fit.
+- **A value that should pop when it changes** (a score, a time): add
+  `data-k="some-name" data-v="the value"`. Only values that changed animate.
 - **A new control:** inputs need `data-path="state.path"`, buttons need
   `data-act="name"` and a matching entry in `ACTIONS` in `control/control.js`.
 

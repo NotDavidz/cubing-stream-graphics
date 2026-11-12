@@ -82,7 +82,7 @@ function section(sec, champion) {
       <div class="list">${r.matches.map(matchBox).join("")}</div>
     </div>`).join("");
   const champ = champion === undefined ? "" : `<div class="round champion">
-      <div class="label">Champion</div><div class="box">${champion ? esc(champion) : "?"}</div></div>`;
+      <div class="label">Champion</div><div class="box"><span data-fit="line">${champion ? esc(champion) : "?"}</span></div></div>`;
   return `<section class="section" style="flex:${Math.max(...sec.rounds.map((r) => r.matches.length)) + 1}">
     ${sec.title ? `<div class="label">${esc(sec.title)}</div>` : ""}
     <div class="rounds">${rounds}${champ}</div>

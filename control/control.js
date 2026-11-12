@@ -40,17 +40,28 @@ const val = (path) => getPath(S, path) ?? "";
 const field = (label, path, attrs = "") =>
   `<label>${label}<input data-path="${esc(path)}" value="${esc(val(path))}" ${attrs}></label>`;
 const number = (label, path) => field(label, path, `type="number" data-type="number" min="0"`);
-const select = (label, path, options, attrs = "") =>
-  `<label>${label}<select data-path="${esc(path)}" ${attrs}>${options.map(([v, t]) =>
-    `<option value="${esc(v)}" ${String(val(path)) === String(v) ? "selected" : ""}>${esc(t)}</option>`).join("")}</select></label>`;
+const select = (label, path, options, attrs = "") => {
+  const current = String(val(path));
+  const missing = options.some(([v]) => String(v) === current) ? "" : `<option value="" selected disabled>— choose —</option>`;
+  return `<label>${label}<select data-path="${esc(path)}" ${attrs}>${missing}${options.map(([v, t]) =>
+    `<option value="${esc(v)}" ${current === String(v) ? "selected" : ""}>${esc(t)}</option>`).join("")}</select></label>`;
+};
 const btn = (text, act, arg = "", cls = "") =>
   `<button data-act="${act}" data-arg="${esc(arg)}" class="${cls}">${text}</button>`;
 const box = (title, body, cls = "") => `<section class="box ${cls}"><h2>${title}</h2>${body}</section>`;
 
+// A collapsible entry (one person, one team). Which ones are open is
+// remembered here so they stay open while the panel redraws.
+const opened = new Set();
+const fold = (key, title, note, body) => `<details data-fold="${esc(key)}" ${opened.has(key) ? "open" : ""}>
+    <summary><b>${esc(title)}</b><span>${esc(note)}</span></summary>${body}</details>`;
+
 const puzzleOptions = () => Object.keys(PUZZLES).map((id) => [id, puzzleName(id)]);
 const people = () => Object.entries(S.competitors || {});
 const teams = () => Object.entries(S.teams || {});
-const sideOptions = () => [...teams().map(([id, t]) => [id, `Team: ${t.name}`]), ...people().map(([id, p]) => [id, p.name])];
+// A match is team v team or player v player, never a mix.
+const matchMode = () => S.match?.mode || (S.competitors?.[S.match?.a] ? "solo" : "team");
+const sideOptions = () => (matchMode() === "solo" ? people() : teams()).map(([id, x]) => [id, x.name]);
 const nameOf = (id) => S.teams?.[id]?.name || S.competitors?.[id]?.name || "—";
 const newId = (prefix) => prefix + Date.now().toString(36);
 
@@ -79,6 +90,8 @@ const TABS = {
           <div><div class="who">${esc(nameOf(m.b))}</div><div class="n">${esc(m.scoreB ?? 0)}</div>
             <div class="r" style="justify-content:center">${btn("−", "score", "scoreB:-1", "big")}${btn("+", "score", "scoreB:1", "big primary")}</div></div>
         </div>
+        <div class="r">${btn("Team v team", "matchMode", "team", matchMode() === "team" ? "on" : "")}
+          ${btn("Player v player", "matchMode", "solo", matchMode() === "solo" ? "on" : "")}</div>
         <div class="r">${select("Side A", "match.a", sideOptions())}${select("Side B", "match.b", sideOptions())}</div>
         <div class="r">${number("Best of", "match.bestOf")}
           <label class="check"><input type="checkbox" data-path="match.show" ${m.show !== false ? "checked" : ""}>Show score on camera frames</label></div>`)
@@ -135,7 +148,7 @@ const TABS = {
         <span class="id">${esc(id)}</span><span class="nm r2">${esc(a)}</span>
         <input data-path="${base}.sa" value="${esc(val(`${base}.sa`))}"><input data-path="${base}.sb" value="${esc(val(`${base}.sb`))}">
         <span class="nm">${esc(b2)}</span>
-        <span class="r">${btn("A wins", "winner", `${base}:a`, won === "a" ? "on" : "")}${btn("B wins", "winner", `${base}:b`, won === "b" ? "on" : "")}</span>
+        <span class="r">${btn("◀ Won", "winner", `${base}:a`, won === "a" ? "on" : "")}${btn("Won ▶", "winner", `${base}:b`, won === "b" ? "on" : "")}</span>
       </div>`;
 
     let results;
@@ -160,7 +173,8 @@ const TABS = {
   }],
 
   people: ["People & teams", () => {
-    const person = ([id, p]) => `<div class="person">
+    const teamOf = (id) => teams().find(([, t]) => (t.members || []).includes(id))?.[1].name || "no team";
+    const person = ([id, p]) => fold(id, p.name, [p.wcaId, teamOf(id)].filter(Boolean).join(" · "), `
         <div class="r">${field("Name", `competitors.${id}.name`)}${field("WCA ID", `competitors.${id}.wcaId`)}</div>
         <div class="r">${field("Program", `competitors.${id}.program`)}${select("Main event", `competitors.${id}.mainEvent`, puzzleOptions())}</div>
         <div class="r">${field("Photo (URL, or assets/photos/file.jpg)", `competitors.${id}.photo`)}${field("One-line bio", `competitors.${id}.bio`)}</div>
@@ -171,15 +185,13 @@ const TABS = {
         <div class="r">
           <select data-act="addEvent" data-arg="${id}" style="width:auto"><option value="">+ Add a puzzle…</option>
             ${puzzleOptions().filter(([ev]) => !p.events?.[ev]).map(([v, t]) => `<option value="${v}">${esc(t)}</option>`).join("")}</select>
-          ${btn("Show on competitor page", "showCompetitor", id)}${btn("Delete person", "delPerson", id, "quiet")}</div>
-      </div>`;
-    const team = ([id, t]) => `<div class="person">
+          ${btn("Show on competitor page", "showCompetitor", id)}${btn("Delete person", "delPerson", id, "quiet")}</div>`);
+    const team = ([id, t]) => fold(id, t.name, `${(t.members || []).length} members`, `
         <div class="r">${field("Team name", `teams.${id}.name`)}${field("Short tag", `teams.${id}.tag`, `maxlength="4"`)}${field("Record", `teams.${id}.record`)}</div>
         <div class="r">${field("Motto", `teams.${id}.motto`)}${field("Logo (URL or path)", `teams.${id}.logo`)}</div>
         <div class="pool">${people().map(([pid, p]) =>
           `<label class="check"><input type="checkbox" data-act="member" data-arg="${id}:${pid}" ${(t.members || []).includes(pid) ? "checked" : ""}>${esc(p.name)}</label>`).join("")}</div>
-        <div class="r">${btn("Show on team page", "showTeam", id)}${btn("Delete team", "delPath", `teams.${id}`, "quiet")}</div>
-      </div>`;
+        <div class="r">${btn("Show on team page", "showTeam", id)}${btn("Delete team", "delTeam", id, "quiet")}</div>`);
     return box("Teams", teams().map(team).join("") + `<div class="r">${btn("+ Add team", "addTeam", "", "primary")}</div>`)
       + box("Competitors", people().map(person).join("") + `<div class="r">${btn("+ Add competitor", "addPerson", "", "primary")}</div>`);
   }],
@@ -208,6 +220,14 @@ const ACTIONS = {
   score: (arg) => {
     const [key, delta] = arg.split(":");
     store.set(`match.${key}`, Math.max(0, (Number(S.match?.[key]) || 0) + Number(delta)));
+  },
+  // Switching kind puts the first two teams (or players) on the two sides.
+  matchMode: (mode) => {
+    const ids = (mode === "solo" ? people() : teams()).map(([id]) => id);
+    const fits = (id) => ids.includes(id);
+    const a = fits(S.match?.a) ? S.match.a : ids[0] || "";
+    const b = fits(S.match?.b) ? S.match.b : ids.find((id) => id !== a) || "";
+    store.patch([{ path: "match.mode", value: mode }, { path: "match.a", value: a }, { path: "match.b", value: b }]);
   },
   resetScore: () => store.patch([{ path: "match.scoreA", value: 0 }, { path: "match.scoreB", value: 0 }]),
   swapSides: () => {
@@ -252,9 +272,18 @@ const ACTIONS = {
   swissUndo: () => confirm("Delete the newest Swiss round?") &&
     store.set("bracket.swissRounds", (S.bracket.swissRounds || []).slice(0, -1)),
 
-  addPerson: () => store.set(`competitors.${newId("c")}`,
-    { name: "New competitor", wcaId: "", program: "", bio: "", photo: "", mainEvent: "333", events: { "333": { single: "", average: "" } } }),
-  addTeam: () => store.set(`teams.${newId("t")}`, { name: "New team", tag: "", logo: "", motto: "", record: "", members: [] }),
+  addPerson: () => {
+    const id = newId("c");
+    opened.add(id);
+    store.set(`competitors.${id}`,
+      { name: "New competitor", wcaId: "", program: "", bio: "", photo: "", mainEvent: "333", events: { "333": { single: "", average: "" } } });
+  },
+  addTeam: () => {
+    const id = newId("t");
+    opened.add(id);
+    store.set(`teams.${id}`, { name: "New team", tag: "", logo: "", motto: "", record: "", members: [] });
+  },
+  delTeam: (id) => confirm(`Delete ${nameOf(id)}?`) && store.set(`teams.${id}`, null),
   addEvent: (id, el) => el.value && store.set(`competitors.${id}.events.${el.value}`, { single: "", average: "" }),
   delPath: (path) => store.set(path, null),
   delPerson: (id) => confirm(`Delete ${nameOf(id)}?`) && store.patch([
@@ -311,6 +340,8 @@ function render() {
   const active = document.activeElement;
   const key = active?.dataset?.path;
   const keep = key && { value: active.value, start: active.selectionStart, end: active.selectionEnd };
+  const button = active?.tagName === "BUTTON" && active.dataset.act
+    ? `button[data-act="${active.dataset.act}"][data-arg="${CSS.escape(active.dataset.arg || "")}"]` : "";
 
   document.querySelector("#tabs").innerHTML = Object.entries(TABS).map(([id, [name]]) =>
     `<button data-tab="${id}" class="${id === tab ? "on" : ""}">${name}</button>`).join("");
@@ -327,7 +358,14 @@ function render() {
       }
     }
   }
+  if (button) app.querySelector(button)?.focus();
 }
+
+// <details> does not bubble its toggle event, so listen on the way down.
+app.addEventListener("toggle", (e) => {
+  const key = e.target.dataset?.fold;
+  if (key) opened[e.target.open ? "add" : "delete"](key);
+}, true);
 
 document.querySelector("#tabs").addEventListener("click", (e) => {
   const id = e.target.dataset.tab;

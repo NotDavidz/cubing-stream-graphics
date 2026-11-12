@@ -9,9 +9,11 @@
   .hero { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; text-align: center; }
   .message { font-size: 44px; font-weight: 700; text-transform: uppercase; }
   .clock { font-size: 210px; font-weight: 800; line-height: 1; color: var(--y-gold); font-variant-numeric: tabular-nums; }
-  .next { height: 150px; flex: none; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 30px; padding: 0 34px; }
+  .next { height: 150px; flex: none; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 30px; padding: 0 34px; }
   .next .team { display: flex; align-items: center; gap: 20px; font-size: 40px; font-weight: 800; text-transform: uppercase; color: var(--y-gold); }
-  .next .team.b { flex-direction: row-reverse; color: var(--y-pale); }
+  .next .team.b { flex-direction: row-reverse; color: var(--y-pale); text-align: right; }
+  .next .team span { flex: 1; }
+  .hero { padding: 0 40px; }
   .next .mid { text-align: center; }
   .next .mid b { display: block; font-size: 46px; font-weight: 800; color: var(--white); }
 </style>
@@ -56,11 +58,11 @@ store.subscribe((state) => {
   target = parseTarget(i.countdownTo);
   paint(".banner", banner(i.title || "Starting Soon", state.event?.subtitle));
   paint(".infobar", eventInfobar(state));
-  paint("#hero", `<div class="message">${esc(i.message || "")}</div>${target ? `<div class="clock"></div>` : ""}`);
+  paint("#hero", `<div class="message" data-fit="wrap">${esc(i.message || "")}</div>${target ? `<div class="clock"></div>` : ""}`);
   paint("#next", `
-    <div class="team a">${avatar(a, 96, "a")}${esc(a.name)}</div>
+    <div class="team a">${avatar(a, 96, "a")}<span data-fit="line">${esc(a.name)}</span></div>
     <div class="mid"><span class="label">Up next</span><b>VS</b></div>
-    <div class="team b">${avatar(b, 96, "b")}${esc(b.name)}</div>`);
+    <div class="team b">${avatar(b, 96, "b")}<span data-fit="line">${esc(b.name)}</span></div>`);
   tick();
 });
 </script>

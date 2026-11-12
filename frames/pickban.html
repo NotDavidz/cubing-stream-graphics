@@ -7,9 +7,12 @@
 <style>
   main { display: flex; flex-direction: column; gap: 22px; }
 
-  .turn { height: 104px; flex: none; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 0 28px; gap: 24px; }
+  .turn { height: 104px; flex: none; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, auto) minmax(0, 1fr); align-items: center; padding: 0 28px; gap: 24px; }
   .turn .team { display: flex; align-items: center; gap: 18px; font-size: 34px; font-weight: 800; text-transform: uppercase; color: var(--y-gold); opacity: .45; transition: opacity .3s; }
-  .turn .team.b { flex-direction: row-reverse; color: var(--y-pale); }
+  .turn .team.b { flex-direction: row-reverse; color: var(--y-pale); text-align: right; }
+  .turn .team span { flex: 1; }
+  .turn .now { min-width: 0; max-width: 760px; }
+  .card h3, .card .slot { max-width: 100%; padding: 0 12px; }
   .turn .team.active { opacity: 1; }
   .turn .now { text-align: center; }
   .turn .now b { display: block; font-size: 44px; font-weight: 800; line-height: 1.05; text-transform: uppercase; }
@@ -17,7 +20,7 @@
   .turn .now b.pick { color: var(--y-bright); }
 
   .cards { flex: 1; display: flex; gap: 16px; min-height: 0; }
-  .card { flex: 1; min-width: 0; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 26px;
+  .card { flex: 1; min-width: 0; overflow: hidden; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 26px;
           transition: opacity .35s ease; }
   .card .puzzle { width: 150px !important; height: 150px !important; transition: color .35s; }
   .card h3 { font-size: 32px; font-weight: 800; text-transform: uppercase; color: var(--y-gold); text-align: center; line-height: 1.05; transition: color .35s; }
@@ -46,7 +49,7 @@
 <script type="module">
 import { store } from "../shared/store.js";
 import { pickbanStatus } from "../shared/pickban.js";
-import { initStage, paint, esc, entity, avatar, puzzle, banner, eventInfobar, puzzleName } from "../shared/ui.js";
+import { initStage, paint, esc, entity, avatar, puzzle, banner, eventInfobar, puzzleName, shortName } from "../shared/ui.js";
 
 initStage();
 
@@ -59,17 +62,17 @@ function drawCards(status, sides) {
     host.dataset.key = key;
     host.innerHTML = status.cards.map((c, i) => `
       <div class="card panel rise" style="animation-delay:${i * 0.05}s" data-event="${esc(c.event)}">
-        ${puzzle(c.event)}<h3>${esc(puzzleName(c.event, true))}</h3><div class="slot"></div>
+        ${puzzle(c.event)}<h3 data-fit="line">${esc(puzzleName(c.event, true))}</h3><div class="slot"></div>
       </div>`).join("");
   }
   for (const c of status.cards) {
     const el = host.querySelector(`[data-event="${CSS.escape(c.event)}"]`);
     el.className = `card panel ${c.status} ${c.side}`;
-    const who = esc(sides[c.side]?.tag || sides[c.side]?.name || "");
+    const who = c.side ? esc(shortName(sides[c.side])) : "";
     paint(el.querySelector(".slot"), {
-      banned: `<span class="tag alert pop">Banned · ${who}</span>`,
-      picked: `<span class="tag ${c.side === "b" ? "pale" : ""} pop">Pick · ${who}</span>`,
-      decider: `<span class="tag pop" style="background:var(--y-bright)">Decider</span>`,
+      banned: `<span class="tag alert pop" data-fit="line">Banned · ${who}</span>`,
+      picked: `<span class="tag ${c.side === "b" ? "pale" : ""} pop" data-fit="line">Pick · ${who}</span>`,
+      decider: `<span class="tag pop" data-fit="line" style="background:var(--y-bright)">Decider</span>`,
       open: "",
     }[c.status]);
   }
@@ -83,12 +86,12 @@ store.subscribe((state) => {
   paint(".banner", banner("Pick & Ban"));
   paint(".infobar", eventInfobar(state));
   paint("#turn", `
-    <div class="team a ${next?.side === "a" ? "active" : ""}">${avatar(sides.a, 64, "a")}${esc(sides.a.name)}</div>
+    <div class="team a ${next?.side === "a" ? "active" : ""}">${avatar(sides.a, 64, "a")}<span data-fit="line">${esc(sides.a.name)}</span></div>
     <div class="now">${next
-      ? `<span class="label">${esc(sides[next.side].name)} to</span><b class="${next.type}">${next.type}</b>`
-      : `<span class="label">Locked in</span><b class="gold">${status.playing.map((e) => esc(puzzleName(e, true))).join(" · ")}</b>`}
+      ? `<span class="label">${esc(sides[next.side].name)} to</span><b class="${next.type}" data-fit="line">${next.type}</b>`
+      : `<span class="label">Locked in</span><b class="gold" data-fit="line">${status.playing.map((e) => esc(puzzleName(e, true))).join(" · ")}</b>`}
     </div>
-    <div class="team b ${next?.side === "b" ? "active" : ""}">${avatar(sides.b, 64, "b")}${esc(sides.b.name)}</div>`);
+    <div class="team b ${next?.side === "b" ? "active" : ""}">${avatar(sides.b, 64, "b")}<span data-fit="line">${esc(sides.b.name)}</span></div>`);
   drawCards(status, sides);
 });
 </script>

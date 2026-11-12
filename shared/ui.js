@@ -1,0 +1,122 @@
+// Helpers shared by every frame: canvas scaling, URL options, and the small
+// pieces of markup (banner, info bar, avatar, puzzle icon) that repeat.
+
+import { puzzleIcon, puzzleName } from "./puzzles.js";
+
+export const params = new URLSearchParams(location.search);
+export const LOGO = new URL("../assets/logo.png", import.meta.url).href;
+
+const KEY_COLOURS = { green: "#00ff00", magenta: "#ff00ff", blue: "#0000ff" };
+
+// Fit the 1920x1080 canvas to whatever window it is shown in, and apply the
+// URL options every frame understands:
+//   ?bg=green|magenta|blue   chroma colour behind/through the frame (post editing)
+//   ?bg=none                 solid frames: drop the patterned background
+//   ?still=1                 no animation (for exporting stills)
+export function initStage() {
+  const stage = document.querySelector(".stage");
+  const bg = params.get("bg");
+  if (KEY_COLOURS[bg]) {
+    document.documentElement.style.setProperty("--key", KEY_COLOURS[bg]);
+    if (!stage.classList.contains("solid")) document.body.style.background = KEY_COLOURS[bg];
+  }
+  if (bg === "none") stage.classList.add("no-bg");
+  if (params.has("still")) document.body.classList.add("still");
+
+  const fit = () => {
+    const scale = Math.min(innerWidth / 1920, innerHeight / 1080);
+    stage.style.transform = `translate(${(innerWidth - 1920 * scale) / 2}px, ${(innerHeight - 1080 * scale) / 2}px) scale(${scale})`;
+    // In a browser window that is not 16:9, fill the spare space with black.
+    const exact = Math.abs(innerWidth / innerHeight - 16 / 9) < 0.01;
+    document.body.classList.toggle("letterbox", !exact && stage.classList.contains("solid") && bg !== "none");
+  };
+  addEventListener("resize", fit);
+  fit();
+  return stage;
+}
+
+export function esc(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+// Replace an element's contents only when they changed, so animations do not
+// restart every time some unrelated part of the state is edited.
+export function paint(target, html) {
+  const el = typeof target === "string" ? document.querySelector(target) : target;
+  if (el && el.__html !== html) {
+    el.innerHTML = html;
+    el.__html = html;
+  }
+}
+
+// ---------- Looking things up in the state ----------
+
+// A "side" of a match can be a team or a single competitor.
+export function entity(state, id) {
+  const team = state.teams?.[id];
+  if (team) {
+    return {
+      kind: "team", id, name: team.name, tag: team.tag || "", photo: team.logo || "",
+      detail: team.motto || "",
+      members: (team.members || []).map((m) => state.competitors?.[m]).filter(Boolean),
+    };
+  }
+  const person = state.competitors?.[id];
+  if (person) {
+    const own = Object.values(state.teams || {}).find((t) => (t.members || []).includes(id));
+    return {
+      kind: "person", id, name: person.name, tag: "", photo: person.photo || "",
+      detail: person.wcaId || "", team: own?.name || "", members: [],
+    };
+  }
+  return { kind: "none", id, name: id || "TBD", tag: "", photo: "", detail: "", members: [] };
+}
+
+export function initials(name) {
+  return String(name || "?").trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join("");
+}
+
+// ---------- Markup ----------
+
+// Photos may be a full URL or a path inside this project ("assets/photos/x.jpg").
+export function asset(path) {
+  return /^(https?:|data:|\/)/.test(path) ? path : new URL(`../${path}`, import.meta.url).href;
+}
+
+export function avatar(thing, size = 120, cls = "") {
+  const inner = thing.photo
+    ? `<img src="${esc(asset(thing.photo))}" alt="">`
+    : esc(thing.tag || initials(thing.name));
+  return `<div class="avatar ${cls}" style="width:${size}px;font-size:${Math.round(size * 0.36)}px">${inner}</div>`;
+}
+
+export function puzzle(id, size = 80, cls = "") {
+  return `<span class="puzzle ${cls}" style="width:${size}px;height:${size}px">${puzzleIcon(id)}</span>`;
+}
+
+export function banner(title, subtitle = "") {
+  return `<img class="logo" src="${LOGO}" alt="">
+    <div class="strip"></div>
+    <div class="bar">${esc(title)}</div>
+    ${subtitle ? `<div class="subbar">${esc(subtitle)}</div>` : ""}`;
+}
+
+// Footer bar: big gold text | white rule | two small white lines.
+export function infobar(big, line1, line2) {
+  return `<div class="row">
+      <div class="big">${esc(big)}</div>
+      <div class="rule"></div>
+      <div class="small"><b>${esc(line1)}</b>${esc(line2)}</div>
+    </div>
+    <div class="strip"></div>`;
+}
+
+// The default footer most solid frames use.
+export function eventInfobar(state) {
+  const e = state.event || {};
+  return infobar(e.title || "", [e.round, puzzleName(e.puzzle, true)].filter(Boolean).join(" · "),
+    [e.format, e.location].filter(Boolean).join(" · "));
+}
+
+export { puzzleIcon, puzzleName };

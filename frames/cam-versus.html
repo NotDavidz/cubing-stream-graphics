@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Camera frame (head to head)</title>
+<link rel="stylesheet" href="../shared/theme.css">
+<link rel="stylesheet" href="../shared/camera.css">
+<style>
+  .top { position: absolute; left: 110px; right: 110px; top: 0; }
+  .top .scorebar { animation: wipe .5s ease-out both; }
+  .foot { position: absolute; left: 110px; right: 110px; bottom: 34px; margin: 0; }
+</style>
+</head>
+<body>
+<!-- Hollow frame with two camera windows. Put it ABOVE the two camera sources in OBS.
+     Camera windows (canvas pixels): A = 52,262 900x506   B = 968,262 900x506 -->
+<div class="stage hollow">
+  <div id="backdrop"></div>
+  <header class="banner top">
+    <img class="logo" id="logo" alt="">
+    <div class="strip"></div>
+    <div class="scorebar" id="scorebar"></div>
+  </header>
+  <div class="cam a" id="cam-a"><div class="edge"></div><div id="burst-a"></div></div>
+  <div class="cam b" id="cam-b"><div class="edge"></div><div id="burst-b"></div></div>
+  <div class="result a" id="result-a"></div>
+  <div class="result b" id="result-b"></div>
+  <footer class="infobar foot"></footer>
+</div>
+<script type="module">
+import { store } from "../shared/store.js";
+import { initStage, paint, esc, avatar, eventInfobar, LOGO } from "../shared/ui.js";
+import { camInfo, camClass, burst, scoreBar, backdrop } from "../shared/camera.js";
+
+// Change these numbers to move or resize the camera windows.
+const WINDOWS = {
+  a: { x: 52, y: 262, w: 900, h: 506 },
+  b: { x: 968, y: 262, w: 900, h: 506 },
+};
+
+initStage();
+document.querySelector("#logo").src = LOGO;
+document.querySelector("#backdrop").innerHTML = backdrop(Object.values(WINDOWS));
+for (const [slot, r] of Object.entries(WINDOWS)) {
+  // The frame sits just outside the hole so no camera pixels are covered.
+  Object.assign(document.querySelector(`#cam-${slot}`).style,
+    { left: `${r.x - 8}px`, top: `${r.y - 8}px`, width: `${r.w + 16}px`, height: `${r.h + 16}px` });
+  Object.assign(document.querySelector(`#result-${slot}`).style,
+    { left: `${r.x - 8}px`, top: `${r.y + r.h + 20}px`, width: `${r.w + 16}px` });
+}
+
+store.subscribe((state) => {
+  paint("#scorebar", scoreBar(state));
+  paint(".infobar", eventInfobar(state));
+  for (const slot of ["a", "b"]) {
+    const { cam, who, status } = camInfo(state, slot);
+    document.querySelector(`#cam-${slot}`).className = camClass(state, slot);
+    paint(`#burst-${slot}`, burst(state, slot));
+    paint(`#result-${slot}`, `
+      ${avatar(who, 78, slot)}
+      <span class="nm">${esc(who.name)}</span>
+      ${who.team ? `<small>${esc(who.team)}</small>` : ""}
+      ${cam.time ? `<span class="time pop">${esc(cam.time)}</span>` : ""}
+      ${status.label ? `<span class="tag ${status.tone === "alert" ? "alert" : ""} pop" style="font-size:26px">${esc(status.label)}</span>` : ""}`);
+  }
+});
+</script>
+</body>
+</html>

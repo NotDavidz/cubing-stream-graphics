@@ -1,0 +1,7 @@
+# Live state written by server.py while you run a stream
+data/state.json
+data/state.tmp
+# Stills written by tools/export_stills.py
+exports/
+__pycache__/
+.claude/

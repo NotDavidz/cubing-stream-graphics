@@ -1,0 +1,47 @@
+{
+  "event": {
+    "title": "UW Cubing League",
+    "subtitle": "Fall 2026",
+    "round": "Semifinal",
+    "puzzle": "333",
+    "format": "Best of 5",
+    "location": "MC 2038"
+  },
+  "program": { "scene": "versus", "competitor": "c1", "team": "t1" },
+  "competitors": {
+    "c1": { "name": "Sample Solver One", "wcaId": "2019SAMP01", "program": "Math, 3B", "bio": "Club champion, Winter 2026.", "mainEvent": "333",
+            "photo": "", "events": { "333": { "single": "6.52", "average": "8.14" }, "222": { "single": "1.31", "average": "2.60" }, "pyram": { "single": "2.10", "average": "3.85" }, "sq1": { "single": "9.87", "average": "12.40" } } },
+    "c2": { "name": "Sample Solver Two", "wcaId": "2021SAMP02", "program": "Engineering, 2A", "bio": "", "mainEvent": "sq1",
+            "photo": "", "events": { "333": { "single": "7.80", "average": "9.92" }, "sq1": { "single": "6.45", "average": "8.71" }, "444": { "single": "31.20", "average": "36.05" } } },
+    "c3": { "name": "Sample Solver Three", "wcaId": "2022SAMP03", "program": "Science, 1B", "bio": "", "mainEvent": "minx",
+            "photo": "", "events": { "333": { "single": "8.95", "average": "10.80" }, "minx": { "single": "42.10", "average": "47.33" } } },
+    "c4": { "name": "Sample Solver Four", "wcaId": "2018SAMP04", "program": "CS, 4A", "bio": "", "mainEvent": "333",
+            "photo": "", "events": { "333": { "single": "5.98", "average": "7.75" }, "333oh": { "single": "11.40", "average": "14.02" }, "skewb": { "single": "2.44", "average": "4.10" } } },
+    "c5": { "name": "Sample Solver Five", "wcaId": "2023SAMP05", "program": "Arts, 2B", "bio": "", "mainEvent": "pyram",
+            "photo": "", "events": { "333": { "single": "9.40", "average": "11.65" }, "pyram": { "single": "1.88", "average": "3.02" }, "clock": { "single": "4.31", "average": "5.60" } } },
+    "c6": { "name": "Sample Solver Six", "wcaId": "", "program": "Health, 1A", "bio": "", "mainEvent": "fto",
+            "photo": "", "events": { "333": { "single": "12.02", "average": "14.90" }, "fto": { "single": "28.60", "average": "33.15" } } }
+  },
+  "teams": {
+    "t1": { "name": "Team Geese", "tag": "GSE", "logo": "", "motto": "Honk if you sub-10.", "record": "3 - 1", "members": ["c1", "c2", "c3"] },
+    "t2": { "name": "Team Cubers", "tag": "CUB", "logo": "", "motto": "Full step ahead.", "record": "2 - 2", "members": ["c4", "c5", "c6"] }
+  },
+  "match": { "a": "t1", "b": "t2", "scoreA": 0, "scoreB": 0, "bestOf": 5, "show": true },
+  "cameras": {
+    "a": { "competitor": "c1", "status": "none", "time": "" },
+    "b": { "competitor": "c4", "status": "none", "time": "" }
+  },
+  "pickban": {
+    "pool": ["333", "222", "444", "pyram", "skewb", "sq1", "minx"],
+    "sequence": ["a:ban", "b:ban", "a:pick", "b:pick", "a:ban", "b:ban"],
+    "actions": []
+  },
+  "bracket": {
+    "format": "single",
+    "title": "Playoffs",
+    "entrants": ["Team Geese", "Team Cubers", "Team Three", "Team Four", "Team Five", "Team Six", "Team Seven", "Team Eight"],
+    "results": {},
+    "swissRounds": []
+  },
+  "intermission": { "title": "Starting Soon", "message": "The stream will begin shortly", "countdownTo": "" }
+}

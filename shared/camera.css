@@ -1,0 +1,96 @@
+/* Hollow frames: everything that sits around live camera footage.
+   The camera area itself is left empty (transparent, or the ?bg= key colour). */
+
+.stage.hollow { background: none; }
+
+/* ---------- A camera window: thin frame, bulge, status burst ---------- */
+
+.cam { position: absolute; --edge: var(--y-gold); }
+.cam.b { --edge: var(--y-pale); }
+
+.cam .edge {
+  position: absolute; inset: 0;
+  border: 8px solid var(--edge);
+  transition: border-color .25s;
+}
+
+/* The bulge: a tab growing out of the bottom edge of the frame. */
+.cam .bulge {
+  position: absolute; left: 50%; bottom: 0; transform: translateX(-50%);
+  height: 62px; padding: 0 54px;
+  background: var(--edge); color: var(--ink);
+  clip-path: polygon(34px 0, calc(100% - 34px) 0, 100% 100%, 0 100%);
+  display: flex; align-items: center; gap: 18px;
+  font-size: 28px; font-weight: 800; text-transform: uppercase; white-space: nowrap;
+  transition: background .25s;
+}
+.cam .bulge .puzzle { color: var(--ink); }
+.cam .bulge .num {
+  background: var(--ink); color: var(--y-gold);
+  min-width: 48px; height: 44px; padding: 0 8px;
+  display: flex; align-items: center; justify-content: center; font-size: 32px;
+}
+.cam .bulge .num.b { color: var(--y-pale); }
+.cam .bulge .sep { width: 4px; height: 34px; background: var(--ink); }
+
+/* Name plate in the top-left corner of the window. */
+.cam .plate {
+  position: absolute; left: 8px; top: 8px;
+  display: flex; align-items: stretch; height: 58px;
+  font-weight: 800; text-transform: uppercase; white-space: nowrap;
+}
+.cam .plate .nm { background: var(--ink); color: var(--edge); padding: 0 20px; font-size: 30px; display: flex; align-items: center; gap: 14px; }
+.cam .plate .nm small { color: var(--white); font-size: 18px; letter-spacing: 2px; }
+.cam .plate .time { background: var(--edge); color: var(--ink); padding: 0 18px; font-size: 34px; display: flex; align-items: center; font-variant-numeric: tabular-nums; }
+
+/* Status burst: "+2", "DNF", "WIN"... pops into the top-right corner. */
+.cam .burst {
+  position: absolute; right: 8px; top: 8px;
+  padding: 4px 30px; font-size: 104px; font-weight: 800; line-height: 1.1;
+  background: var(--y-bright); color: var(--ink);
+}
+
+/* Good news: the frame goes bright yellow. */
+.cam.good { --edge: var(--y-bright); }
+
+/* Penalties: the frame turns red and glows. The only place red and a glow
+   are used, so it cannot be missed. */
+.cam.alert { --edge: var(--alert); }
+.cam.alert .edge { box-shadow: 0 0 40px 8px rgba(226, 59, 46, .75), inset 0 0 60px 10px rgba(226, 59, 46, .65); animation: alarm 1s ease-in-out infinite; }
+.cam.alert .burst { background: var(--alert); color: var(--white); }
+.cam.alert .bulge, .cam.alert .plate .time { color: var(--white); }
+.cam.alert .bulge .puzzle { color: var(--white); }
+@keyframes alarm {
+  0%, 100% { box-shadow: 0 0 26px 4px rgba(226, 59, 46, .55), inset 0 0 40px 6px rgba(226, 59, 46, .5); }
+  50%      { box-shadow: 0 0 60px 12px rgba(226, 59, 46, .95), inset 0 0 90px 18px rgba(226, 59, 46, .85); }
+}
+
+/* ---------- Score bar (head-to-head) ---------- */
+
+.scorebar {
+  height: 90px; background: var(--y-gold); color: var(--ink);
+  display: grid; grid-template-columns: 1fr auto auto auto 1fr; align-items: center; gap: 22px;
+  padding: 0 16px; font-weight: 800; text-transform: uppercase; white-space: nowrap;
+}
+.scorebar .team { display: flex; align-items: center; gap: 16px; font-size: 40px; min-width: 0; overflow: hidden; }
+.scorebar .team.b { flex-direction: row-reverse; }
+.scorebar .team .avatar { background: var(--ink); color: var(--y-gold); }
+.scorebar .num {
+  width: 84px; height: 70px; background: var(--ink); color: var(--y-gold);
+  display: flex; align-items: center; justify-content: center; font-size: 54px;
+}
+.scorebar .num.b { color: var(--y-pale); }
+.scorebar .mid { display: flex; align-items: center; gap: 14px; font-size: 20px; line-height: 1.15; letter-spacing: 1px; min-width: 190px; justify-content: center; }
+.scorebar .mid .puzzle { color: var(--ink); }
+
+/* ---------- Result plate under a camera (two-camera frame) ---------- */
+
+.result {
+  position: absolute; height: 78px; background: var(--panel);
+  display: flex; align-items: center; gap: 18px; padding: 0 20px 0 0;
+  font-weight: 800; text-transform: uppercase; white-space: nowrap;
+}
+.result .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 34px; color: var(--y-gold); }
+.result.b .nm { color: var(--y-pale); }
+.result small { font-size: 18px; letter-spacing: 2px; color: var(--white); }
+.result .time { font-size: 46px; color: var(--white); font-variant-numeric: tabular-nums; }

@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Versus</title>
+<link rel="stylesheet" href="../shared/theme.css">
+<style>
+  main { display: grid; grid-template-columns: 1fr 400px 1fr; gap: 22px; }
+
+  .side { padding: 28px; display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+  .side .head { display: flex; align-items: center; gap: 24px; }
+  .side .name { font-size: 50px; font-weight: 800; line-height: 1.05; text-transform: uppercase; color: var(--y-gold); }
+  .side .detail { font-size: 22px; font-weight: 500; color: var(--white); margin-top: 6px; }
+  .side-b .head { flex-direction: row-reverse; text-align: right; }
+  .side-b .name { color: var(--y-pale); }
+
+  .rows { display: flex; flex-direction: column; gap: 10px; }
+  .row { display: flex; align-items: center; gap: 16px; background: var(--panel-2); padding: 10px 14px; font-size: 27px; font-weight: 600; }
+  .row .grow { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row .value { font-weight: 800; color: var(--y-gold); }
+  .side-b .row { flex-direction: row-reverse; text-align: right; }
+  .side-b .row .value, .side-b .puzzle { color: var(--y-pale); }
+
+  .centre { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; }
+  .scores { display: flex; align-items: center; gap: 18px; }
+  .score { width: 150px; text-align: center; font-size: 190px; font-weight: 800; line-height: 1; color: var(--white); }
+  .score.lead { color: var(--y-gold); }
+  .vs { font-size: 40px; font-weight: 800; color: var(--y-gold); }
+  .pips { display: flex; gap: 60px; }
+  .pips div { display: flex; gap: 6px; }
+  .pips i { width: 26px; height: 26px; background: var(--panel-2); }
+  .pips i.on { background: var(--y-gold); }
+  .pips .b i.on { background: var(--y-pale); }
+</style>
+</head>
+<body>
+<div class="stage solid">
+  <header class="banner"></header>
+  <main>
+    <section class="side side-a panel rise" id="a"></section>
+    <section class="centre panel" id="centre"></section>
+    <section class="side side-b panel rise" id="b"></section>
+  </main>
+  <footer class="infobar"></footer>
+</div>
+<script type="module">
+import { store } from "../shared/store.js";
+import { initStage, paint, esc, entity, avatar, puzzle, banner, eventInfobar, puzzleName } from "../shared/ui.js";
+
+initStage();
+
+function side(state, id, which) {
+  const e = entity(state, id);
+  let rows;
+  if (e.kind === "team") {
+    rows = e.members.map((m) => `<div class="row">
+        ${avatar(m, 52, which)}<span class="grow">${esc(m.name)}</span>${m.mainEvent ? puzzle(m.mainEvent, 44) : ""}
+      </div>`).join("");
+  } else {
+    const p = state.competitors?.[id] || {};
+    const pb = p.events?.[state.event?.puzzle] || {};
+    const event = puzzleName(state.event?.puzzle, true);
+    rows = [
+      ["WCA ID", p.wcaId], ["Team", e.team],
+      [`${event} single`, pb.single], [`${event} average`, pb.average],
+    ].filter(([, v]) => v).map(([k, v]) =>
+      `<div class="row"><span class="grow">${esc(k)}</span><span class="value">${esc(v)}</span></div>`).join("");
+  }
+  return `<div class="head">${avatar(e, 170, which)}
+      <div><div class="name">${esc(e.name)}</div><div class="detail">${esc(e.kind === "team" ? e.detail : "")}</div></div>
+    </div><div class="rows">${rows}</div>`;
+}
+
+function pips(won, needed) {
+  return Array.from({ length: needed }, (_, i) => `<i class="${i < won ? "on" : ""}"></i>`).join("");
+}
+
+store.subscribe((state) => {
+  const m = state.match || {};
+  const a = Number(m.scoreA) || 0, b = Number(m.scoreB) || 0;
+  const needed = Math.ceil((Number(m.bestOf) || 1) / 2);
+  paint(".banner", banner("Matchup", [state.event?.round, puzzleName(state.event?.puzzle)].filter(Boolean).join(" · ")));
+  paint("#a", side(state, m.a, "a"));
+  paint("#b", side(state, m.b, "b"));
+  paint("#centre", `
+    <div class="label">Best of ${esc(m.bestOf || 1)}</div>
+    <div class="scores">
+      <div class="score pop ${a > b ? "lead" : ""}" data-v="${a}">${a}</div>
+      <div class="vs">VS</div>
+      <div class="score pop ${b > a ? "lead" : ""}" data-v="${b}">${b}</div>
+    </div>
+    <div class="pips"><div class="a">${pips(a, needed)}</div><div class="b">${pips(b, needed)}</div></div>`);
+  paint(".infobar", eventInfobar(state));
+});
+</script>
+</body>
+</html>

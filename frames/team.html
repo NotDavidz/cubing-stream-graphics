@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Team overview</title>
+<link rel="stylesheet" href="../shared/theme.css">
+<style>
+  main { display: grid; grid-template-columns: 430px 1fr; gap: 22px; }
+
+  .team { padding: 30px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; text-align: center; }
+  .team .name { font-size: 56px; font-weight: 800; line-height: 1.05; text-transform: uppercase; color: var(--y-gold); }
+  .team .motto { font-size: 24px; font-weight: 500; }
+  .team .record { font-size: 44px; font-weight: 800; }
+
+  .members { display: flex; gap: 16px; }
+  .member { flex: 1; min-width: 0; padding: 22px; display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
+  .member .avatar { width: 100% !important; max-width: 260px; font-size: 90px !important; }
+  .member h3 { font-size: 30px; font-weight: 800; line-height: 1.1; text-transform: uppercase; color: var(--y-gold); }
+  .member .wca { font-size: 20px; font-weight: 600; letter-spacing: 1px; }
+  .member .main { margin-top: auto; display: flex; align-items: center; gap: 14px; background: var(--panel-2); padding: 10px 16px; align-self: stretch; justify-content: center; }
+  .member .main b { font-size: 26px; font-weight: 800; }
+  .member .main span.label { display: block; font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="stage solid">
+  <header class="banner"></header>
+  <main></main>
+  <footer class="infobar"></footer>
+</div>
+<script type="module">
+import { store } from "../shared/store.js";
+import { initStage, params, paint, esc, entity, avatar, puzzle, banner, eventInfobar, puzzleName } from "../shared/ui.js";
+
+initStage();
+
+// Shows ?id=t1 if given, otherwise the team the operator selected.
+store.subscribe((state) => {
+  const id = params.get("id") || state.program?.team;
+  const team = state.teams?.[id];
+  paint(".banner", banner("Team"));
+  paint(".infobar", eventInfobar(state));
+  if (!team) return paint("main", "");
+
+  const e = entity(state, id);
+  const members = e.members.map((m, i) => {
+    const pb = m.events?.[m.mainEvent] || {};
+    return `<section class="member panel rise" style="animation-delay:${0.08 * (i + 1)}s">
+      ${avatar(m, 220)}
+      <h3>${esc(m.name)}</h3>
+      <div class="wca">${esc(m.wcaId || "")}</div>
+      ${m.mainEvent ? `<div class="main">${puzzle(m.mainEvent, 54)}
+        <div><span class="label">${esc(puzzleName(m.mainEvent, true))} avg</span><b>${esc(pb.average || "–")}</b></div></div>` : ""}
+    </section>`;
+  }).join("");
+
+  paint("main", `
+    <section class="team panel rise">
+      ${avatar(e, 230)}
+      <div class="name">${esc(team.name)}</div>
+      ${team.motto ? `<div class="motto">${esc(team.motto)}</div>` : ""}
+      ${team.record ? `<div class="label">Record</div><div class="record">${esc(team.record)}</div>` : ""}
+    </section>
+    <div class="members">${members}</div>`);
+});
+</script>
+</body>
+</html>

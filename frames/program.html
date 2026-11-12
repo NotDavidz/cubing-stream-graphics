@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Program (operator-switched)</title>
+<style>
+  html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: transparent; }
+  iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; transition: opacity .3s; }
+  iframe.out { opacity: 0; }
+</style>
+</head>
+<body>
+<script type="module">
+// One source that shows whichever frame the operator picks in the control
+// panel ("On screen now"). Add this once in OBS, or open it full-screen on
+// the projector, and switch pages without touching OBS or the projector.
+import { store } from "../shared/store.js";
+
+const SCENES = ["versus", "pickban", "bracket", "competitor", "team", "intermission", "cam-versus", "cam-solo", "scorebug"];
+let showing = "";
+
+store.subscribe((state) => {
+  const scene = SCENES.includes(state.program?.scene) ? state.program.scene : "intermission";
+  if (scene === showing) return;
+  showing = scene;
+  const next = document.createElement("iframe");
+  next.className = "out";
+  next.src = `${scene}.html${location.search}`;
+  next.onload = () => {
+    next.classList.remove("out");
+    for (const old of document.querySelectorAll("iframe")) {
+      if (old !== next) { old.classList.add("out"); setTimeout(() => old.remove(), 350); }
+    }
+  };
+  document.body.append(next);
+});
+</script>
+</body>
+</html>

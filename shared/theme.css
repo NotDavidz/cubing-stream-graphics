@@ -1,0 +1,161 @@
+/* UW Cubing Club stream graphics — shared design system.
+   Everything visual that repeats across frames lives here. Change a token
+   below and every frame follows. Design rules taken from the club posters:
+   flat colour, square corners, no shadows, heavy uppercase Poppins,
+   near-black triangle-pattern background, gold banner with a pale strip. */
+
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&display=swap");
+
+:root {
+  /* The yellow range. Use these for almost everything. */
+  --y-bright: #fae203;   /* thin accent stripe, live highlights */
+  --y-logo:   #ffd939;   /* the yellow of the UW cube */
+  --y-gold:   #ecc13c;   /* main banner, icons, headline text */
+  --y-deep:   #c8961e;   /* second banner row */
+  --y-pale:   #eae6a3;   /* thin strips, side B, quiet accents */
+
+  /* Neutrals. */
+  --ink:      #1b1b1b;   /* page background, text on gold */
+  --panel:    #2a2a2a;   /* cards and the background triangles */
+  --panel-2:  #353535;   /* rows inside cards */
+  --white:    #ffffff;
+  --muted:    #a9a9a9;
+
+  /* Special-use colours. Never decoration. */
+  --alert:    #e23b2e;   /* +2, DNF, bans */
+  --flag:     #e05a28;   /* "NEW!" style ribbons, decider tag */
+
+  --key: transparent;    /* what shows through camera holes (see ?bg=) */
+  --font: "Poppins", "Segoe UI", system-ui, sans-serif;
+  --side: 110px;         /* left/right page margin on the 1920 canvas */
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  background: transparent;
+  font-family: var(--font);
+  color: var(--white);
+}
+body.letterbox { background: #000; }   /* projected in a normal browser window */
+
+/* ---------- The 1920x1080 canvas ---------- */
+
+.stage {
+  position: absolute; left: 0; top: 0;
+  width: 1920px; height: 1080px;
+  transform-origin: 0 0;
+  overflow: hidden;
+}
+
+.stage.solid {
+  background-color: var(--ink);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='170' height='270'%3E%3Cpath d='M12 10h56l-28 50z M97 195h56l-28-50z' fill='%232a2a2a'/%3E%3C/svg%3E");
+  display: flex; flex-direction: column;
+  padding: 0 var(--side);
+}
+.stage.solid.no-bg { background: none; }
+
+/* Diagonal corner stripes, as on the posters. */
+.stage.solid::before, .stage.solid::after {
+  content: ""; position: absolute; width: 420px; height: 210px;
+  background-repeat: no-repeat; pointer-events: none;
+}
+.stage.solid::before {
+  left: 0; top: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 420 210'%3E%3Cpath d='M0 138v22L320 0h-44z' fill='%23fae203'/%3E%3Cpath d='M0 172v34L412 0h-68z' fill='%23ecc13c'/%3E%3C/svg%3E");
+}
+.stage.solid::after {
+  right: 0; bottom: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 420 210'%3E%3Cpath d='M420 38V4L8 210h68z' fill='%23ecc13c'/%3E%3Cpath d='M420 72V50L100 210h44z' fill='%23eae6a3'/%3E%3C/svg%3E");
+}
+
+/* ---------- Header: logo, pale strip, gold banner ---------- */
+
+.banner { position: relative; padding-top: 118px; flex: none; z-index: 1; }
+.banner .logo {
+  position: absolute; left: 50%; top: 12px; height: 128px;
+  transform: translateX(-50%);
+}
+.banner .strip { height: 14px; background: var(--y-pale); margin-bottom: 10px; }
+.banner .bar {
+  position: relative;
+  height: 92px; background: var(--y-gold); color: var(--ink);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 70px; font-weight: 800; letter-spacing: 1px; line-height: 1;
+  text-transform: uppercase; white-space: nowrap;
+}
+.banner .subbar {
+  height: 50px; background: var(--y-deep); color: var(--white);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 30px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;
+}
+
+main { flex: 1; min-height: 0; margin: 22px 0; position: relative; z-index: 1; }
+
+/* ---------- Footer info bar ---------- */
+
+.infobar { flex: none; margin-bottom: 30px; z-index: 1; }
+.infobar .row {
+  height: 78px; background: var(--panel);
+  display: flex; align-items: center; justify-content: center; gap: 34px;
+}
+.infobar .big {
+  color: var(--y-gold); font-size: 44px; font-weight: 800;
+  text-transform: uppercase; white-space: nowrap;
+}
+.infobar .rule { width: 4px; height: 52px; background: var(--white); }
+.infobar .small { font-size: 22px; line-height: 1.25; text-transform: uppercase; white-space: nowrap; }
+.infobar .small b { display: block; font-weight: 800; letter-spacing: 1.5px; }
+.infobar .strip { height: 12px; background: var(--y-pale); }
+
+/* ---------- Building blocks ---------- */
+
+.panel { background: var(--panel); }
+
+.label {
+  font-size: 18px; font-weight: 700; letter-spacing: 3px;
+  text-transform: uppercase; color: var(--muted);
+}
+.gold { color: var(--y-gold); }
+.pale { color: var(--y-pale); }
+.upper { text-transform: uppercase; }
+
+/* Square avatar: a photo, or initials on gold when there is no photo. */
+.avatar {
+  background: var(--y-gold); color: var(--ink);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800; text-transform: uppercase; overflow: hidden; flex: none;
+  aspect-ratio: 1;
+}
+.avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.side-b .avatar, .avatar.b { background: var(--y-pale); }
+
+.puzzle { display: block; color: var(--y-gold); }
+.puzzle svg { display: block; width: 100%; height: 100%; }
+
+/* Small tag, in the manner of the "NEW!" ribbon. */
+.tag {
+  display: inline-block; padding: 3px 12px;
+  font-size: 18px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase;
+  background: var(--y-gold); color: var(--ink);
+}
+.tag.alert { background: var(--alert); color: var(--white); }
+.tag.flag  { background: var(--flag);  color: var(--white); }
+.tag.pale  { background: var(--y-pale); }
+
+/* ---------- Motion ---------- */
+
+@keyframes rise  { from { opacity: 0; transform: translateY(26px); } to { opacity: 1; transform: none; } }
+@keyframes wipe  { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes pop   { 0% { transform: scale(.4); opacity: 0; } 60% { transform: scale(1.18); opacity: 1; } 100% { transform: scale(1); } }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+
+.banner .bar, .banner .subbar { animation: wipe .5s ease-out both; }
+.rise { animation: rise .45s ease-out both; }
+.pop  { animation: pop .4s ease-out both; }
+
+/* Add ?still=1 to a frame URL to switch all motion off (for still exports). */
+.still *, .still *::before, .still *::after { animation: none !important; transition: none !important; }

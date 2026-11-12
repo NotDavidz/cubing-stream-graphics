@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Bracket</title>
+<link rel="stylesheet" href="../shared/theme.css">
+<style>
+  main { display: flex; flex-direction: column; gap: 14px; --rowh: 44px; }
+
+  /* ----- Elimination ----- */
+  .section { position: relative; display: flex; flex-direction: column; min-height: 0; }
+  .section > .label { color: var(--y-gold); margin-bottom: 4px; }
+  .rounds { flex: 1; display: flex; gap: 56px; min-height: 0; }
+  .round { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .round > .label { height: 30px; font-size: 16px; text-align: center; }
+  .round .list { flex: 1; display: flex; flex-direction: column; justify-content: space-around; }
+  svg.lines { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }
+  svg.lines path { fill: none; stroke: #5c5c5c; stroke-width: 3; }
+
+  .match { display: flex; flex-direction: column; gap: 3px; position: relative; z-index: 1; }
+  .slot { height: var(--rowh); display: flex; align-items: center; background: var(--panel);
+          font-size: calc(var(--rowh) * .52); font-weight: 600; }
+  .slot .seed { width: var(--rowh); text-align: center; color: var(--muted); font-size: .75em; font-weight: 700; flex: none; }
+  .slot .nm { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-transform: uppercase; }
+  .slot b { width: calc(var(--rowh) * 1.15); height: 100%; display: flex; align-items: center; justify-content: center;
+            background: var(--panel-2); font-weight: 800; flex: none; }
+  .slot.win .nm { color: var(--y-gold); font-weight: 800; }
+  .slot.win b { background: var(--y-gold); color: var(--ink); }
+  .slot.lose { opacity: .5; }
+  .slot.empty .nm { color: #666; }
+
+  .champion { flex: .8; display: flex; flex-direction: column; justify-content: center; align-items: stretch; text-align: center; }
+  .champion .box { background: var(--y-gold); color: var(--ink); padding: 14px 10px; font-size: 30px; font-weight: 800; text-transform: uppercase; line-height: 1.1; }
+  .champion .label { margin-bottom: 8px; color: var(--y-gold); }
+
+  /* ----- Swiss ----- */
+  .swiss { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 22px; min-height: 0; }
+  .swiss section { padding: 22px 26px; display: flex; flex-direction: column; gap: 6px; min-height: 0; }
+  .swiss h2 { font-size: 30px; font-weight: 800; text-transform: uppercase; color: var(--y-gold); margin-bottom: 8px; }
+  .line { display: grid; grid-template-columns: 54px 1fr 110px 80px; align-items: center; background: var(--panel-2);
+          height: var(--rowh); font-size: calc(var(--rowh) * .52); font-weight: 600; text-transform: uppercase; }
+  .line > * { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .line .rank { text-align: center; font-weight: 800; color: var(--y-gold); }
+  .line .rec, .line .diff { text-align: center; font-weight: 800; }
+  .line .diff { color: var(--muted); }
+  .line.head { background: none; height: 24px; }
+  .pairings { display: flex; flex-direction: column; gap: 10px; }
+  .pairings .slot { background: var(--panel-2); }
+  .pairings .slot b { background: #444; }
+</style>
+</head>
+<body>
+<div class="stage solid">
+  <header class="banner"></header>
+  <main></main>
+  <footer class="infobar"></footer>
+</div>
+<script type="module">
+import { store } from "../shared/store.js";
+import { buildElimination, swissStandings } from "../shared/bracket.js";
+import { initStage, paint, esc, banner, eventInfobar } from "../shared/ui.js";
+
+initStage();
+const main = document.querySelector("main");
+
+function slot(s, score, result) {
+  const cls = s.bye || s.pending ? "empty" : result;
+  return `<div class="slot ${cls}">
+    <span class="seed">${s.seed || ""}</span>
+    <span class="nm">${s.pending ? "—" : esc(s.name)}</span>
+    <b>${esc(score)}</b></div>`;
+}
+
+function matchBox(m) {
+  const res = (side) => (m.won ? (m.won === side ? "win" : "lose") : "");
+  return `<div class="match">${slot(m.a, m.sa, res("a"))}${slot(m.b, m.sb, res("b"))}</div>`;
+}
+
+function section(sec, champion) {
+  const rounds = sec.rounds.map((r) => `<div class="round">
+      <div class="label">${esc(r.title)}</div>
+      <div class="list">${r.matches.map(matchBox).join("")}</div>
+    </div>`).join("");
+  const champ = champion === undefined ? "" : `<div class="round champion">
+      <div class="label">Champion</div><div class="box">${champion ? esc(champion) : "?"}</div></div>`;
+  return `<section class="section" style="flex:${Math.max(...sec.rounds.map((r) => r.matches.length)) + 1}">
+    ${sec.title ? `<div class="label">${esc(sec.title)}</div>` : ""}
+    <div class="rounds">${rounds}${champ}</div>
+    <svg class="lines"></svg>
+  </section>`;
+}
+
+// Elbow connectors from each match to the one its winner feeds.
+// offsetLeft/Top are used so the maths ignores the canvas scaling.
+function drawLines() {
+  for (const sec of main.querySelectorAll(".section")) {
+    const pos = (el) => {
+      let x = 0, y = 0;
+      for (let n = el; n && n !== sec; n = n.offsetParent) { x += n.offsetLeft; y += n.offsetTop; }
+      return { x, y, w: el.offsetWidth, h: el.offsetHeight };
+    };
+    const cols = [...sec.querySelectorAll(".round:not(.champion)")].map((r) => [...r.querySelectorAll(".match")].map(pos));
+    let d = "";
+    for (let c = 1; c < cols.length; c++) {
+      const prev = cols[c - 1], cur = cols[c];
+      cur.forEach((to, i) => {
+        const feeders = prev.length === cur.length * 2 ? [prev[2 * i], prev[2 * i + 1]]
+          : prev.length === cur.length ? [prev[i]] : [];
+        for (const from of feeders) {
+          const x1 = from.x + from.w, y1 = from.y + from.h / 2, y2 = to.y + to.h / 2, mid = (x1 + to.x) / 2;
+          d += `M${x1} ${y1}H${mid}V${y2}H${to.x}`;
+        }
+      });
+    }
+    sec.querySelector("svg").innerHTML = `<path d="${d}"/>`;
+  }
+}
+
+function elimination(b) {
+  const built = buildElimination(b.format, b.entrants || [], b.results || {});
+  const last = built.sections[0].rounds.at(-1).matches[0];
+  // Each bracket gets height in proportion to its tallest round (see section()).
+  const tallest = built.sections.map((s) => Math.max(...s.rounds.map((r) => r.matches.length)));
+  const total = tallest.reduce((sum, n) => sum + n + 1, 0);
+  const perMatch = Math.min(...tallest.map((n) => (main.clientHeight * (n + 1) / total - 60) / n));
+  main.style.setProperty("--rowh", `${Math.max(14, Math.min(46, Math.floor((perMatch - 12) / 2)))}px`);
+  return built.sections.map((s, i) => section(s, i === 0 ? (last.won ? last.winner.name : "") : undefined)).join("");
+}
+
+function swiss(b) {
+  const entrants = b.entrants || [], rounds = b.swissRounds || [];
+  const table = swissStandings(entrants, rounds);
+  main.style.setProperty("--rowh", `${Math.max(20, Math.min(46, Math.floor(500 / Math.max(table.length, 1)) - 6))}px`);
+  const rows = table.map((p, i) => `<div class="line">
+      <span class="rank">${i + 1}</span><span>${esc(p.name)}</span>
+      <span class="rec">${p.wins} - ${p.losses}</span><span class="diff">${p.diff > 0 ? "+" : ""}${p.diff}</span></div>`).join("");
+  const current = rounds.at(-1) || [];
+  const pairs = current.map((m) => matchBox({
+    a: { name: m.a }, b: m.b ? { name: m.b } : { bye: true, name: "BYE" },
+    sa: m.sa, sb: m.sb, won: m.winner,
+  })).join("");
+  return `<div class="swiss">
+    <section class="panel"><h2>Standings</h2>
+      <div class="line head label"><span></span><span></span><span class="rec">W - L</span><span class="diff">+/-</span></div>${rows}</section>
+    <section class="panel"><h2>${rounds.length ? `Round ${rounds.length}` : "Pairings"}</h2>
+      <div class="pairings">${pairs || `<div class="label">No rounds yet</div>`}</div></section>
+  </div>`;
+}
+
+store.subscribe((state) => {
+  const b = state.bracket || {};
+  paint(".banner", banner(b.title || "Bracket"));
+  paint(".infobar", eventInfobar(state));
+  paint(main, b.format === "swiss" ? swiss(b) : elimination(b));
+  drawLines();
+});
+document.fonts?.ready.then(drawLines);
+</script>
+</body>
+</html>

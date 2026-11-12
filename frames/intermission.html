@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Intermission</title>
+<link rel="stylesheet" href="../shared/theme.css">
+<style>
+  main { display: flex; flex-direction: column; gap: 22px; }
+  .hero { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; text-align: center; }
+  .message { font-size: 44px; font-weight: 700; text-transform: uppercase; }
+  .clock { font-size: 210px; font-weight: 800; line-height: 1; color: var(--y-gold); font-variant-numeric: tabular-nums; }
+  .next { height: 150px; flex: none; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 30px; padding: 0 34px; }
+  .next .team { display: flex; align-items: center; gap: 20px; font-size: 40px; font-weight: 800; text-transform: uppercase; color: var(--y-gold); }
+  .next .team.b { flex-direction: row-reverse; color: var(--y-pale); }
+  .next .mid { text-align: center; }
+  .next .mid b { display: block; font-size: 46px; font-weight: 800; color: var(--white); }
+</style>
+</head>
+<body>
+<div class="stage solid">
+  <header class="banner"></header>
+  <main>
+    <section class="hero panel" id="hero"></section>
+    <section class="next panel" id="next"></section>
+  </main>
+  <footer class="infobar"></footer>
+</div>
+<script type="module">
+import { store } from "../shared/store.js";
+import { initStage, paint, esc, entity, avatar, banner, eventInfobar } from "../shared/ui.js";
+
+initStage();
+let target = null;
+
+// countdownTo is a clock time today ("18:00") or a full date-time.
+function parseTarget(text) {
+  if (!text) return null;
+  const hm = /^(\d{1,2}):(\d{2})$/.exec(text.trim());
+  if (hm) { const d = new Date(); d.setHours(+hm[1], +hm[2], 0, 0); return d; }
+  const d = new Date(text);
+  return isNaN(d) ? null : d;
+}
+
+function tick() {
+  const el = document.querySelector(".clock");
+  if (!el || !target) return;
+  const left = Math.max(0, Math.round((target - Date.now()) / 1000));
+  const h = Math.floor(left / 3600), m = Math.floor(left / 60) % 60, s = left % 60;
+  el.textContent = (h ? `${h}:${String(m).padStart(2, "0")}` : m) + ":" + String(s).padStart(2, "0");
+}
+setInterval(tick, 250);
+
+store.subscribe((state) => {
+  const i = state.intermission || {};
+  const a = entity(state, state.match?.a), b = entity(state, state.match?.b);
+  target = parseTarget(i.countdownTo);
+  paint(".banner", banner(i.title || "Starting Soon", state.event?.subtitle));
+  paint(".infobar", eventInfobar(state));
+  paint("#hero", `<div class="message">${esc(i.message || "")}</div>${target ? `<div class="clock"></div>` : ""}`);
+  paint("#next", `
+    <div class="team a">${avatar(a, 96, "a")}${esc(a.name)}</div>
+    <div class="mid"><span class="label">Up next</span><b>VS</b></div>
+    <div class="team b">${avatar(b, 96, "b")}${esc(b.name)}</div>`);
+  tick();
+});
+</script>
+</body>
+</html>

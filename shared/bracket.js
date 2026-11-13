@@ -5,6 +5,11 @@
 // match id. Everything else, including who advances, is worked out here.
 //
 //   state.bracket.results["W1-1"] = { sa: 3, sb: 1, winner: "a" }
+//
+// Byes: when the entrant count is not a power of two, the top seeds have no
+// first-round opponent. Their first-round "match" is a walkover: it is marked
+// walkover: true so nothing draws it, and the seed simply appears in the next
+// round, waiting for an opponent.
 
 const BYE = { bye: true, name: "BYE" };
 
@@ -28,7 +33,11 @@ function roundTitle(matchesInRound, prefix = "") {
 
 // format: "single" or "double". Returns
 //   { sections: [{ title, rounds: [{ title, matches: [match] }] }] }
-// where match = { id, a, b, sa, sb, winner } and a/b = { name, bye?, pending? }.
+// where match = { id, a, b, sa, sb, won, winner, loser, walkover, feeders }
+// and a/b = { name, seed?, bye?, pending? }.
+//   won       "a" | "b" | ""
+//   walkover  one side is a bye, so there is nothing to play or draw
+//   feeders   [id | null, id | null]: the match whose winner fills slot a / b
 export function buildElimination(format, entrants, results = {}) {
   const count = Math.max(entrants.length, format === "double" ? 4 : 2);
   const size = 2 ** Math.ceil(Math.log2(count));
@@ -92,7 +101,11 @@ export function buildElimination(format, entrants, results = {}) {
       winner = won === "a" ? a : b;
       loser = won === "a" ? b : a;
     }
-    return (cache[id] = { id, a, b, sa: res.sa ?? "", sb: res.sb ?? "", won, winner, loser });
+    return (cache[id] = {
+      id, a, b, sa: res.sa ?? "", sb: res.sb ?? "", won, winner, loser,
+      walkover: Boolean(a.bye || b.bye),
+      feeders: defs[id].map((def) => (def.take === "winner" ? def.from : null)),
+    });
   }
 
   const toRounds = (list, title) => list.map((ids, i) => ({

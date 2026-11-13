@@ -9,22 +9,36 @@
   /* The operator's panel. Viewers never see this page. */
   html, body { overflow: auto; height: auto; background: var(--ink); }
   body { font-size: 15px; padding-bottom: 60px; }
+  [hidden] { display: none !important; }
 
+  /* ---------- Top bar and tabs ---------- */
   header.top { position: sticky; top: 0; z-index: 5; background: var(--y-gold); color: var(--ink); display: flex; align-items: center; gap: 16px; padding: 8px 16px; flex-wrap: wrap; }
   header.top h1 { font-size: 20px; font-weight: 800; text-transform: uppercase; margin-right: auto; }
   header.top .conn { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+  header.top .conn.off { background: var(--alert); color: var(--white); padding: 4px 8px; }
   nav { display: flex; gap: 4px; flex-wrap: wrap; }
   nav button { background: var(--ink); color: var(--y-gold); }
   nav button.on { background: var(--white); color: var(--ink); }
 
-  #app { max-width: 1280px; margin: 0 auto; padding: 16px; display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 16px; align-items: start; }
+  /* ---------- Page layout ---------- */
+  #onair, #app { max-width: 1280px; margin: 0 auto; padding: 16px 16px 0; }
+  #onair { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 16px; align-items: start; }
+  #app { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 16px; align-items: start; }
+  @media (max-width: 900px) { #onair { grid-template-columns: minmax(0, 1fr); } }
+
   .box { background: var(--panel); padding: 16px; display: flex; flex-direction: column; gap: 10px; min-width: 0; overflow-wrap: anywhere; }
   .box.wide { grid-column: 1 / -1; }
   .box h2 { font-size: 16px; font-weight: 800; text-transform: uppercase; color: var(--y-gold); letter-spacing: 1px; }
   .box h3 { font-size: 13px; font-weight: 700; text-transform: uppercase; color: var(--muted); letter-spacing: 1px; margin-top: 6px; }
+  .box h3.gold { color: var(--y-gold); }
   .hint { font-size: 13px; color: var(--muted); }
+  .hint b { color: var(--white); }
+  code { color: var(--y-pale); font-size: 13px; }
+  a { color: var(--y-gold); }
 
-  .r { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  /* ---------- Fields and buttons ---------- */
+  .r { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; }
+  .r.centre { justify-content: center; }
   .r > label { flex: 1; min-width: 120px; }
   .r > * { max-width: 100%; }
   label { display: flex; flex-direction: column; gap: 3px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
@@ -37,19 +51,53 @@
   textarea { min-height: 150px; resize: vertical; }
 
   button { cursor: pointer; font-weight: 700; text-transform: uppercase; font-size: 13px; letter-spacing: .5px; }
+  button:hover { border-color: var(--y-gold); }
   button:disabled { cursor: default; }
   button:disabled:hover { border-color: transparent; }
-  button:hover { border-color: var(--y-gold); }
   button.on, button.primary { background: var(--y-gold); color: var(--ink); }
   button.alert { background: var(--alert); }
   button.big { font-size: 22px; padding: 8px 18px; }
   button.quiet { background: none; color: var(--muted); }
 
-  .score { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: center; text-align: center; }
-  .score .n { font-size: 60px; font-weight: 800; line-height: 1; color: var(--y-gold); }
-  .score > div { min-width: 0; }
-  .score .who { font-weight: 800; text-transform: uppercase; margin-bottom: 6px; }
+  /* A switch: a label and a strip of joined buttons, one of them lit. */
+  .switch { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .switch > span { font-size: 14px; font-weight: 600; }
+  .seg { display: flex; gap: 2px; flex-wrap: wrap; }
 
+  /* ---------- On screen now ---------- */
+  #top { background: var(--panel); padding: 16px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  #top h2 { font-size: 16px; font-weight: 800; text-transform: uppercase; color: var(--y-gold); letter-spacing: 1px; }
+  .scenes { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; }
+  .scene { display: flex; border: 2px solid var(--panel-2); }
+  .scene button { border: 0; padding: 10px; }
+  .scene .name { flex: 1; text-align: left; line-height: 1.15; }
+  .scene .go { background: #444; color: var(--y-gold); width: 70px; flex: none; padding: 10px 4px; }
+  .scene .go:hover, .scene .name:hover { background: #505050; }
+  .scene.sel { border-color: var(--white); }
+  .scene.live { border-color: var(--y-gold); }
+  .scene.live .go { background: var(--alert); color: var(--white); }
+  .scene.live .name { background: var(--y-gold); color: var(--ink); }
+
+  #preview { background: var(--panel); padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+  /* Grey checks stand in for the camera behind a hollow frame. */
+  #preview .screen { position: relative; aspect-ratio: 16 / 9; outline: 2px solid var(--panel-2);
+                     background: repeating-conic-gradient(#3a3a3a 0 25%, #303030 0 50%) 0 0 / 24px 24px; }
+  #preview iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; pointer-events: none; }
+  #preview .cap { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
+  #preview.live .screen { outline-color: var(--alert); }
+  #preview.live .cap { color: var(--white); }
+
+  .notice { flex-direction: row; align-items: center; justify-content: space-between; flex-wrap: wrap; outline: 2px solid var(--white); outline-offset: -2px; }
+  .note { background: var(--panel-2); padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+
+  /* ---------- Score ---------- */
+  .score { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: center; text-align: center; }
+  .score > div { min-width: 0; }
+  .score .n { font-size: 60px; font-weight: 800; line-height: 1; color: var(--y-gold); margin-bottom: 6px; }
+  .score .who { font-weight: 800; text-transform: uppercase; margin-bottom: 6px; }
+  .score .mid { display: flex; flex-direction: column; gap: 8px; }
+
+  /* ---------- Bracket results ---------- */
   .m { display: grid; grid-template-columns: 52px minmax(0, 1fr) 56px 56px minmax(0, 1fr) auto; gap: 6px; align-items: center; }
   .m .r { flex-wrap: nowrap; }
   .m button { white-space: nowrap; }
@@ -58,24 +106,29 @@
   .m .nm.r2 { text-align: right; }
   .m input { text-align: center; }
 
+  /* ---------- Pick lists ---------- */
   .pool { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
   .pz { display: flex; align-items: center; gap: 8px; text-align: left; white-space: normal; }
   .pz .puzzle { width: 26px; height: 26px; flex: none; }
   .pz.banned { opacity: .45; text-decoration: line-through; }
   .pz.picked, .pz.decider { border-color: var(--y-gold); }
+  .card { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; padding: 10px 12px; }
+  .card small { font-size: 11px; font-weight: 600; opacity: .7; }
+  .ev { width: 110px; font-weight: 700; align-self: center; }
 
+  /* ---------- Folding entries (people, teams) ---------- */
   details { background: var(--panel-2); }
   details > summary { cursor: pointer; padding: 10px 12px; display: flex; gap: 12px; align-items: baseline; list-style: none; }
   details > summary::before { content: "+"; color: var(--y-gold); font-weight: 800; width: 12px; }
   details[open] > summary::before { content: "−"; }
   details > summary::-webkit-details-marker { display: none; }
   details > summary span { color: var(--muted); font-size: 13px; }
-  details[open] { background: none; outline: 2px solid var(--panel-2); padding: 0 12px 12px; display: flex; flex-direction: column; gap: 8px; }
+  details[open] { background: none; outline: 2px solid var(--panel-2); padding: 0 12px 12px; }
   details[open] > summary { padding: 10px 0; }
   details[open] > * + * { margin-top: 8px; }
-  .url { display: grid; grid-template-columns: minmax(110px, 190px) minmax(0, 1fr) auto auto; gap: 8px; align-items: center; }
-  .url code { font-size: 13px; color: var(--y-pale); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  a { color: var(--y-gold); }
+
+  .url { display: grid; grid-template-columns: minmax(110px, 220px) minmax(0, 1fr) auto auto; gap: 8px; align-items: center; }
+  .url code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 </style>
 </head>
 <body>
@@ -84,6 +137,12 @@
   <nav id="tabs"></nav>
   <span class="conn" id="conn"></span>
 </header>
+<!-- Scene buttons and a small preview. Only the Live tab uses this strip; the
+     preview sits outside #app so it is not reloaded every time the tab redraws. -->
+<div id="onair" hidden>
+  <section id="top"></section>
+  <aside id="preview"><div class="screen"><iframe title="Preview" tabindex="-1"></iframe></div><div class="cap"></div></aside>
+</div>
 <div id="app"></div>
 <script type="module" src="control.js"></script>
 </body>

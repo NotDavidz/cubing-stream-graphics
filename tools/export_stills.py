@@ -14,11 +14,13 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 BASE = "http://localhost:8080/frames/"
-FRAMES = ["versus", "pickban", "bracket", "competitor", "team", "intermission",
-          "cam-versus", "cam-solo", "cam-solo?slot=b", "scorebug"]
+# Keep in step with shared/scenes.js.
+FRAMES = ["versus", "pickban", "bracket", "competitor", "team", "victory", "intermission",
+          "cam-versus", "cam-solo?slot=a", "cam-solo?slot=b", "scorebug"]
 BROWSERS = [
     r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
     r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
@@ -40,11 +42,11 @@ def main():
     browser = find_browser()
     out = Path(__file__).resolve().parent.parent / "exports"
     out.mkdir(exist_ok=True)
-    with tempfile.TemporaryDirectory() as profile:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as profile:
         for frame in FRAMES:
             name, _, query = frame.partition("?")
             url = f"{base}{name}.html?still=1" + (f"&{query}" if query else "")
-            target = out / (frame.replace("?slot=", "-") + ".png")
+            target = out / (frame.replace("?slot=", "-") + ".png")   # cam-solo-a.png
             target.unlink(missing_ok=True)
             try:
                 subprocess.run([
@@ -55,6 +57,11 @@ def main():
                 ], check=False, timeout=40, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             except subprocess.TimeoutExpired:
                 pass
+            # The browser can return a moment before the file lands on disk.
+            for _ in range(40):
+                if target.exists() and target.stat().st_size:
+                    break
+                time.sleep(0.25)
             print("saved" if target.exists() else "FAILED", target)
 
 

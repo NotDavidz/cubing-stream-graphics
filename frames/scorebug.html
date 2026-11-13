@@ -17,7 +17,8 @@
 </head>
 <body>
 <!-- Fully transparent overlay: just the score bar, to lay over any footage.
-     ?pos=bottom moves it to the bottom of the picture. -->
+     Top or bottom is chosen in the control panel (Live > Score bug).
+     ?pos=top or ?pos=bottom pins it instead. -->
 <div class="stage hollow">
   <div class="bug rise" id="bug"><div class="strip"></div><div class="scorebar" id="scorebar"></div></div>
 </div>
@@ -27,8 +28,11 @@ import { initStage, params, paint } from "../shared/ui.js";
 import { scoreBar } from "../shared/camera.js";
 
 initStage();
-if (params.get("pos") === "bottom") document.querySelector("#bug").classList.add("bottom");
-store.subscribe((state) => paint("#scorebar", scoreBar(state)));
+store.subscribe((state) => {
+  const pos = params.get("pos") || state.program?.bugPos;
+  document.querySelector("#bug").classList.toggle("bottom", pos === "bottom");
+  paint("#scorebar", scoreBar(state));
+});
 </script>
 </body>
 </html>

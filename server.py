@@ -11,10 +11,12 @@ Zero dependencies (Python 3.8+ standard library only). It does three things:
 Run:   python server.py            (this computer only)
        python server.py --lan      (also reachable from phones/laptops on the network)
        python server.py --port 9000
+       python server.py --state data/finals.json   (keep a separate state file)
 """
 import argparse
 import copy
 import json
+import os
 import queue
 import socket
 import threading
@@ -25,19 +27,39 @@ ROOT = Path(__file__).resolve().parent
 STATE_FILE = ROOT / "data" / "state.json"
 DEFAULT_FILE = ROOT / "data" / "default-state.json"
 
+# Sections that are plain option lists: missing options are filled in from the
+# defaults. (Rosters and results are never touched.)
+SETTING_SECTIONS = ("event", "program", "match", "settings", "victory", "intermission")
+
 lock = threading.Lock()
 state = {}
 rev = 0
 listeners = set()  # one queue.Queue per connected frame
 
 
+def read_json_file(path):
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else None
+    except (OSError, ValueError):
+        return None
+
+
+def with_defaults(data):
+    """Fill in top-level sections a state file from an older version lacks,
+    so new frames and settings work without resetting anything."""
+    defaults = read_json_file(DEFAULT_FILE) or {}
+    for key, value in defaults.items():
+        if key not in data:
+            data[key] = value
+        elif isinstance(value, dict) and isinstance(data[key], dict) and key in SETTING_SECTIONS:
+            for inner, inner_value in value.items():
+                data[key].setdefault(inner, inner_value)
+    return data
+
+
 def load_state():
-    for path in (STATE_FILE, DEFAULT_FILE):
-        try:
-            return json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            continue
-    return {}
+    return with_defaults(read_json_file(STATE_FILE) or {})
 
 
 def save_state():
@@ -141,7 +163,7 @@ class Handler(SimpleHTTPRequestHandler):
                 elif path == "/api/state":
                     if not isinstance(body, dict):
                         raise ValueError("state must be an object")
-                    state = body
+                    state = with_defaults(body)
                 elif path == "/api/reset":
                     state = json.loads(DEFAULT_FILE.read_text(encoding="utf-8"))
                 else:
@@ -187,18 +209,31 @@ def lan_address():
         return None
 
 
+class Server(ThreadingHTTPServer):
+    daemon_threads = True
+    # On Windows, address reuse lets a second copy start on the same port and
+    # steal half the requests. Refuse to start instead.
+    allow_reuse_address = os.name != "nt"
+
+
 def main():
-    global state
+    global state, STATE_FILE
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--port", type=int, default=8080)
     parser.add_argument("--lan", action="store_true",
                         help="allow other devices on the network to connect")
+    parser.add_argument("--state", type=Path, default=STATE_FILE,
+                        help="state file to use (default: data/state.json)")
     args = parser.parse_args()
 
+    STATE_FILE = args.state.resolve()
     state = load_state()
     host = "0.0.0.0" if args.lan else "127.0.0.1"
-    server = ThreadingHTTPServer((host, args.port), Handler)
-    server.daemon_threads = True
+    try:
+        server = Server((host, args.port), Handler)
+    except OSError:
+        raise SystemExit(f"Port {args.port} is already in use. The graphics server is probably "
+                         f"running already; close it first, or pass --port with another number.")
 
     print("UW Cubing stream graphics are running.\n")
     print(f"  Control panel:  http://localhost:{args.port}/control/")

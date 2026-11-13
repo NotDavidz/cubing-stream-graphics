@@ -5,7 +5,7 @@
 <title>Versus</title>
 <link rel="stylesheet" href="../shared/theme.css">
 <style>
-  main { display: grid; grid-template-columns: 1fr 400px 1fr; gap: 22px; }
+  main { display: grid; grid-template-columns: minmax(0, 1fr) 440px minmax(0, 1fr); gap: 22px; }
 
   .side { padding: 28px; display: flex; flex-direction: column; gap: 20px; min-width: 0; }
   .side .head { display: flex; align-items: center; gap: 24px; }
@@ -15,23 +15,30 @@
   .side-b .head { flex-direction: row-reverse; text-align: right; }
   .side-b .name { color: var(--y-pale); }
 
-  .rows { display: flex; flex-direction: column; gap: 10px; }
+  .rows { display: flex; flex-direction: column; gap: 10px; min-height: 0; overflow: hidden; }
   .row { display: flex; align-items: center; gap: 16px; background: var(--panel-2); padding: 10px 14px; font-size: 27px; font-weight: 600; }
   .row .grow { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .row .value { font-weight: 800; color: var(--y-gold); }
   .side-b .row { flex-direction: row-reverse; text-align: right; }
   .side-b .row .value, .side-b .puzzle { color: var(--y-pale); }
 
-  .centre { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; }
-  .scores { display: flex; align-items: center; gap: 18px; }
-  .score { width: 150px; text-align: center; font-size: 190px; font-weight: 800; line-height: 1; color: var(--white); }
+  .centre { display: flex; flex-direction: column; align-items: stretch; justify-content: center; gap: 18px; padding: 0 24px; text-align: center; }
+  .centre .label b { display: block; color: var(--white); font-weight: 700; margin-top: 4px; }
+  /* Each score gets half the panel and shrinks to fit, so 10 and up still fit. */
+  .scores { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 14px; }
+  .score { font-size: 190px; font-weight: 800; line-height: 190px; height: 190px; color: var(--white); }
   .score.lead { color: var(--y-gold); }
   .vs { font-size: 40px; font-weight: 800; color: var(--y-gold); }
-  .pips { display: flex; gap: 60px; }
-  .pips div { display: flex; gap: 6px; }
-  .pips i { width: 26px; height: 26px; background: var(--panel-2); }
+
+  /* One pip per win needed. The pips share the width, so a long series
+     (first to 7, first to 10) gets narrower pips instead of spilling out. */
+  .pips { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 34px; }
+  .pips div { display: flex; gap: var(--pip-gap, 6px); justify-content: center; }
+  .pips i { flex: 0 1 26px; min-width: 0; height: 26px; background: var(--panel-2); }
   .pips i.on { background: var(--y-gold); }
   .pips .b i.on { background: var(--y-pale); }
+  .pips.long { --pip-gap: 3px; }
+  .pips.long i { height: 20px; }
 </style>
 </head>
 <body>
@@ -46,19 +53,19 @@
 </div>
 <script type="module">
 import { store } from "../shared/store.js";
-import { initStage, paint, esc, entity, avatar, puzzle, banner, eventInfobar, puzzleName } from "../shared/ui.js";
+import { matchInfo } from "../shared/match.js";
+import { initStage, paint, esc, avatar, puzzle, banner, eventInfobar, puzzleName } from "../shared/ui.js";
 
 initStage();
 
-function side(state, id, which) {
-  const e = entity(state, id);
+function side(state, e, which) {
   let rows;
   if (e.kind === "team") {
     rows = e.members.map((m) => `<div class="row">
         ${avatar(m, 52, which)}<span class="grow">${esc(m.name)}</span>${m.mainEvent ? puzzle(m.mainEvent, 44) : ""}
       </div>`).join("");
   } else {
-    const p = state.competitors?.[id] || {};
+    const p = state.competitors?.[e.id] || {};
     const pb = p.events?.[state.event?.puzzle] || {};
     const event = puzzleName(state.event?.puzzle, true);
     rows = [
@@ -77,20 +84,18 @@ function pips(won, needed) {
 }
 
 store.subscribe((state) => {
-  const m = state.match || {};
-  const a = Number(m.scoreA) || 0, b = Number(m.scoreB) || 0;
-  const needed = Math.ceil((Number(m.bestOf) || 1) / 2);
+  const m = matchInfo(state);
   paint(".banner", banner("Matchup", [state.event?.round, puzzleName(state.event?.puzzle)].filter(Boolean).join(" · ")));
   paint("#a", side(state, m.a, "a"));
   paint("#b", side(state, m.b, "b"));
   paint("#centre", `
-    <div class="label">Best of ${esc(m.bestOf || 1)}</div>
+    <div class="label">Best of ${m.bestOf}<b>First to ${m.needed}</b></div>
     <div class="scores">
-      <div class="score ${a > b ? "lead" : ""}" data-k="a" data-v="${a}">${a}</div>
+      <div class="score ${m.leader === "a" ? "lead" : ""}" data-fit="line" data-k="a" data-v="${m.scoreA}">${m.scoreA}</div>
       <div class="vs">VS</div>
-      <div class="score ${b > a ? "lead" : ""}" data-k="b" data-v="${b}">${b}</div>
+      <div class="score ${m.leader === "b" ? "lead" : ""}" data-fit="line" data-k="b" data-v="${m.scoreB}">${m.scoreB}</div>
     </div>
-    <div class="pips"><div class="a">${pips(a, needed)}</div><div class="b">${pips(b, needed)}</div></div>`);
+    <div class="pips ${m.needed > 6 ? "long" : ""}"><div class="a">${pips(m.scoreA, m.needed)}</div><div class="b">${pips(m.scoreB, m.needed)}</div></div>`);
   paint(".infobar", eventInfobar(state));
 });
 </script>

@@ -97,7 +97,7 @@ export function entity(state, id) {
       detail: person.wcaId || "", team: own?.name || "", members: [],
     };
   }
-  return { kind: "none", id, name: id || "TBD", tag: "", photo: "", detail: "", members: [] };
+  return { kind: "none", id, name: "TBD", tag: "", photo: "", detail: "", members: [] };
 }
 
 export function initials(name) {
@@ -144,11 +144,19 @@ export function infobar(big, line1, line2) {
     <div class="strip"></div>`;
 }
 
+// "Best of 5", worked out from the match unless the operator typed their own
+// wording under Settings. A typed "Best of N" is treated as left over from
+// an earlier match, so it can never disagree with the score.
+export function formatLabel(state) {
+  const typed = String(state.event?.format || "").trim();
+  return typed && !/^best of \d+$/i.test(typed) ? typed : `Best of ${Math.max(1, Number(state.match?.bestOf) || 1)}`;
+}
+
 // The default footer most solid frames use.
 export function eventInfobar(state) {
   const e = state.event || {};
   return infobar(e.title || "", [e.round, puzzleName(e.puzzle, true)].filter(Boolean).join(" · "),
-    [e.format, e.location].filter(Boolean).join(" · "));
+    [formatLabel(state), e.location].filter(Boolean).join(" · "));
 }
 
 export { puzzleIcon, puzzleName };

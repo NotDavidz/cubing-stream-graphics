@@ -1,6 +1,7 @@
 // Pieces shared by the hollow (camera) frames.
 
-import { esc, entity, avatar, puzzle, puzzleName } from "./ui.js";
+import { esc, entity, avatar, puzzle, formatLabel } from "./ui.js";
+import { matchInfo } from "./match.js";
 
 // Everything the operator can flash on a camera. `tone` picks the look:
 // "alert" = red glowing frame, "good" = bright yellow frame.
@@ -32,14 +33,13 @@ export function burst(state, slot) {
 }
 
 export function scoreBar(state) {
-  const m = state.match || {}, e = state.event || {};
-  const a = entity(state, m.a), b = entity(state, m.b);
-  const show = m.show !== false;
+  const m = matchInfo(state), e = state.event || {};
+  const { a, b, showScore: show } = m;
   return `
     <div class="team a">${avatar(a, 62)}<span data-fit="line">${esc(a.name)}</span></div>
-    ${show ? `<div class="num a" data-k="a" data-v="${esc(m.scoreA)}">${esc(m.scoreA ?? 0)}</div>` : "<span></span>"}
-    <div class="mid">${puzzle(e.puzzle, 46)}<div><span data-fit="line">${esc(e.round || "")}</span><span data-fit="line">${esc(e.format || puzzleName(e.puzzle, true))}</span></div></div>
-    ${show ? `<div class="num b" data-k="b" data-v="${esc(m.scoreB)}">${esc(m.scoreB ?? 0)}</div>` : "<span></span>"}
+    ${show ? `<div class="num a" data-k="a" data-v="${m.scoreA}">${m.scoreA}</div>` : "<span></span>"}
+    <div class="mid">${puzzle(e.puzzle, 46)}<div><span data-fit="line">${esc(e.round || "")}</span><span data-fit="line">${esc(formatLabel(state))}</span></div></div>
+    ${show ? `<div class="num b" data-k="b" data-v="${m.scoreB}">${m.scoreB}</div>` : "<span></span>"}
     <div class="team b">${avatar(b, 62)}<span data-fit="line">${esc(b.name)}</span></div>`;
 }
 

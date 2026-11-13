@@ -18,7 +18,7 @@
   .name { font-size: 76px; font-weight: 800; line-height: 1; text-transform: uppercase; color: var(--y-gold); }
   .bio { font-size: 26px; font-weight: 500; }
 
-  .events { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; align-content: start; flex: 1; }
+  .events { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; align-content: start; flex: 1; min-height: 0; overflow: hidden; }
   .event { background: var(--panel-2); padding: 20px; display: flex; gap: 22px; align-items: center; }
   .event .puzzle { width: 104px !important; height: 104px !important; flex: none; }
   .event h3 { font-size: 28px; font-weight: 800; text-transform: uppercase; color: var(--y-gold); white-space: nowrap; }
@@ -36,6 +36,7 @@
 </div>
 <script type="module">
 import { store } from "../shared/store.js";
+import { PUZZLES } from "../shared/puzzles.js";
 import { initStage, params, paint, esc, entity, avatar, puzzle, banner, eventInfobar, puzzleName } from "../shared/ui.js";
 
 initStage();
@@ -52,7 +53,10 @@ store.subscribe((state) => {
   const facts = [["WCA ID", p.wcaId], ["Team", e.team], ["Program", p.program]]
     .filter(([, v]) => v)
     .map(([k, v]) => `<div class="fact"><span class="label">${esc(k)}</span><b>${esc(v)}</b></div>`).join("");
-  const events = Object.entries(p.events || {}).map(([ev, t]) => `
+  // Main event first, then the order of the puzzle list.
+  const order = Object.keys(PUZZLES);
+  const rank = (ev) => (ev === p.mainEvent ? -1 : order.indexOf(ev) < 0 ? order.length : order.indexOf(ev));
+  const events = Object.entries(p.events || {}).sort(([x], [y]) => rank(x) - rank(y)).map(([ev, t]) => `
     <div class="event ${ev === p.mainEvent ? "main" : ""}">
       ${puzzle(ev, 84)}
       <div style="min-width:0"><h3 data-fit="line">${esc(puzzleName(ev, true))}</h3>

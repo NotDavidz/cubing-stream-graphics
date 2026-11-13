@@ -12,7 +12,8 @@
   .next { height: 150px; flex: none; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 30px; padding: 0 34px; }
   .next .team { display: flex; align-items: center; gap: 20px; font-size: 40px; font-weight: 800; text-transform: uppercase; color: var(--y-gold); }
   .next .team.b { flex-direction: row-reverse; color: var(--y-pale); text-align: right; }
-  .next .team span { flex: 1; }
+  .next .team span { flex: 1; min-width: 0; }
+  .next .team { min-width: 0; }
   .hero { padding: 0 40px; }
   .next .mid { text-align: center; }
   .next .mid b { display: block; font-size: 46px; font-weight: 800; color: var(--white); }
@@ -34,11 +35,11 @@ import { initStage, paint, esc, entity, avatar, banner, eventInfobar } from "../
 initStage();
 let target = null;
 
-// countdownTo is a clock time today ("18:00") or a full date-time.
+// countdownTo is a clock time today ("18:00" or "18:00:30") or a full date-time.
 function parseTarget(text) {
   if (!text) return null;
-  const hm = /^(\d{1,2}):(\d{2})$/.exec(text.trim());
-  if (hm) { const d = new Date(); d.setHours(+hm[1], +hm[2], 0, 0); return d; }
+  const hm = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(text.trim());
+  if (hm) { const d = new Date(); d.setHours(+hm[1], +hm[2], +(hm[3] || 0), 0); return d; }
   const d = new Date(text);
   return isNaN(d) ? null : d;
 }

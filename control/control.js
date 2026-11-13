@@ -1,314 +1,41 @@
-// Operator control panel.
+// Operator control panel: the wiring.
 //
-// How it works: every input carries data-path="some.state.path" and is saved
-// when it changes; every button carries data-act="actionName" and runs the
-// matching function in ACTIONS. Each tab is one function that returns HTML.
-// To add a control, add markup to a tab and (for buttons) an entry in ACTIONS.
+// Each tab lives in its own file under tabs/ and exports
+//   { id, title, render(), actions, top()?, preview()? }
+// render() returns the HTML of the tab; actions are the functions its
+// buttons run (data-act="name"). To add a tab, write the file and add it to
+// TABS below. The markup helpers are in kit.js.
 
-import { store, getPath } from "../shared/store.js";
-import { esc, puzzleIcon, puzzleName } from "../shared/ui.js";
-import { PUZZLES } from "../shared/puzzles.js";
-import { STATUSES } from "../shared/camera.js";
-import { pickbanStatus, defaultSequence } from "../shared/pickban.js";
-import { buildElimination, swissPair } from "../shared/bracket.js";
+import { store } from "../shared/store.js";
+import { S, setState, onRedraw, opened } from "./kit.js";
+import live from "./tabs/live.js";
+import bracket from "./tabs/bracket.js";
+import people from "./tabs/people.js";
+import settings from "./tabs/settings.js";
+import links from "./tabs/links.js";
 
-const app = document.querySelector("#app");
-let S = null;                                  // latest state
-let tab = location.hash.slice(1) || "live";
-
-const SCENES = [
-  ["intermission", "Intermission"], ["versus", "Versus"], ["pickban", "Pick & ban"], ["bracket", "Bracket"],
-  ["competitor", "Competitor"], ["team", "Team"], ["cam-versus", "Cameras: head to head"],
-  ["cam-solo", "Camera: single"], ["scorebug", "Score bug only"],
-];
-
-const FRAMES = [
-  ["program.html", "Program", "Shows whatever is chosen under \"On screen now\""],
-  ["versus.html", "Versus", "Solid"], ["pickban.html", "Pick & ban", "Solid"], ["bracket.html", "Bracket", "Solid"],
-  ["competitor.html", "Competitor", "Solid. Add ?id=c1 to pin one person"],
-  ["team.html", "Team", "Solid. Add ?id=t1 to pin one team"],
-  ["intermission.html", "Intermission", "Solid"],
-  ["cam-versus.html", "Cameras: head to head", "Hollow, two camera windows"],
-  ["cam-solo.html?slot=a", "Camera A frame", "Hollow, full-size frame"],
-  ["cam-solo.html?slot=b", "Camera B frame", "Hollow, full-size frame"],
-  ["scorebug.html", "Score bug", "Hollow, score bar only. ?pos=bottom"],
-];
-
-// ---------- Small markup helpers ----------
-
-const val = (path) => getPath(S, path) ?? "";
-const field = (label, path, attrs = "") =>
-  `<label>${label}<input data-path="${esc(path)}" value="${esc(val(path))}" ${attrs}></label>`;
-const number = (label, path) => field(label, path, `type="number" data-type="number" min="0"`);
-const select = (label, path, options, attrs = "") => {
-  const current = String(val(path));
-  const missing = options.some(([v]) => String(v) === current) ? "" : `<option value="" selected disabled>— choose —</option>`;
-  return `<label>${label}<select data-path="${esc(path)}" ${attrs}>${missing}${options.map(([v, t]) =>
-    `<option value="${esc(v)}" ${current === String(v) ? "selected" : ""}>${esc(t)}</option>`).join("")}</select></label>`;
-};
-const btn = (text, act, arg = "", cls = "") =>
-  `<button data-act="${act}" data-arg="${esc(arg)}" class="${cls}">${text}</button>`;
-const box = (title, body, cls = "") => `<section class="box ${cls}"><h2>${title}</h2>${body}</section>`;
-
-// A collapsible entry (one person, one team). Which ones are open is
-// remembered here so they stay open while the panel redraws.
-const opened = new Set();
-const fold = (key, title, note, body) => `<details data-fold="${esc(key)}" ${opened.has(key) ? "open" : ""}>
-    <summary><b>${esc(title)}</b><span>${esc(note)}</span></summary>${body}</details>`;
-
-const puzzleOptions = () => Object.keys(PUZZLES).map((id) => [id, puzzleName(id)]);
-const people = () => Object.entries(S.competitors || {});
-const teams = () => Object.entries(S.teams || {});
-// A match is team v team or player v player, never a mix.
-const matchMode = () => S.match?.mode || (S.competitors?.[S.match?.a] ? "solo" : "team");
-const sideOptions = () => (matchMode() === "solo" ? people() : teams()).map(([id, x]) => [id, x.name]);
-const nameOf = (id) => S.teams?.[id]?.name || S.competitors?.[id]?.name || "—";
-const newId = (prefix) => prefix + Date.now().toString(36);
-
-// ---------- Tabs ----------
-
-const TABS = {
-  live: ["Live", () => {
-    const m = S.match || {};
-    const cams = ["a", "b"].map((slot) => {
-      const current = S.cameras?.[slot]?.status || "none";
-      return box(`Camera ${slot.toUpperCase()}`, `
-        <div class="r">${select("Competitor", `cameras.${slot}.competitor`, people().map(([id, p]) => [id, p.name]))}
-          ${field("Time shown", `cameras.${slot}.time`, `placeholder="e.g. 8.14"`)}</div>
-        <div class="r">${Object.entries(STATUSES).map(([id, st]) =>
-          btn(st.button, "status", `${slot}:${id}`, `big ${id === current && id !== "none" ? (st.tone === "alert" ? "alert" : "on") : ""}`)).join("")}</div>`);
-    }).join("");
-
-    return box("On screen now", `
-        <div class="r">${SCENES.map(([id, name]) => btn(name, "scene", id, S.program?.scene === id ? "on" : "")).join("")}</div>
-        <p class="hint">Switches the <b>Program</b> source. Frames added to OBS on their own are not affected.</p>`, "wide")
-      + box("Match score", `
-        <div class="score">
-          <div><div class="who">${esc(nameOf(m.a))}</div><div class="n">${esc(m.scoreA ?? 0)}</div>
-            <div class="r" style="justify-content:center">${btn("−", "score", "scoreA:-1", "big")}${btn("+", "score", "scoreA:1", "big primary")}</div></div>
-          <div>${btn("Swap", "swapSides")}<br><br>${btn("Reset", "resetScore")}</div>
-          <div><div class="who">${esc(nameOf(m.b))}</div><div class="n">${esc(m.scoreB ?? 0)}</div>
-            <div class="r" style="justify-content:center">${btn("−", "score", "scoreB:-1", "big")}${btn("+", "score", "scoreB:1", "big primary")}</div></div>
-        </div>
-        <div class="r">${btn("Team v team", "matchMode", "team", matchMode() === "team" ? "on" : "")}
-          ${btn("Player v player", "matchMode", "solo", matchMode() === "solo" ? "on" : "")}</div>
-        <div class="r">${select("Side A", "match.a", sideOptions())}${select("Side B", "match.b", sideOptions())}</div>
-        <div class="r">${number("Best of", "match.bestOf")}
-          <label class="check"><input type="checkbox" data-path="match.show" ${m.show !== false ? "checked" : ""}>Show score on camera frames</label></div>`)
-      + cams
-      + box("Clear camera status", `
-        <div class="r"><label>After a +2 / DNF / win pops up<select id="autoclear">
-          ${[[0, "Keep it until I press Clear"], [5, "Clear after 5 seconds"], [10, "Clear after 10 seconds"], [20, "Clear after 20 seconds"]]
-            .map(([v, t]) => `<option value="${v}" ${autoClear() === v ? "selected" : ""}>${t}</option>`).join("")}</select></label></div>`)
-      + box("Event details", `
-        <div class="r">${field("Event name", "event.title")}${field("Season / subtitle", "event.subtitle")}</div>
-        <div class="r">${field("Round", "event.round")}${select("Puzzle", "event.puzzle", puzzleOptions())}</div>
-        <div class="r">${field("Format", "event.format")}${field("Location", "event.location")}</div>`)
-      + box("Intermission page", `
-        <div class="r">${field("Title", "intermission.title")}${field("Countdown to", "intermission.countdownTo", `placeholder="18:00, or leave empty"`)}</div>
-        ${field("Message", "intermission.message")}
-        <div class="r">${["Starting Soon", "Be Right Back", "Thanks for Watching"].map((t) => btn(t, "interTitle", t)).join("")}</div>`);
-  }],
-
-  pickban: ["Pick & ban", () => {
-    const pb = S.pickban || {};
-    const status = pickbanStatus(pb);
-    const sides = { a: nameOf(S.match?.a), b: nameOf(S.match?.b) };
-    const next = status.next;
-    return box("Pick & ban", `
-        <p><b>${next ? `${esc(sides[next.side])} to ${next.type.toUpperCase()}` : `Locked in: ${status.playing.map((e) => esc(puzzleName(e, true))).join(", ")}`}</b>
-          ${next ? " — click the puzzle they choose." : ""}</p>
-        <div class="pool">${status.cards.map((c) =>
-          `<button class="pz ${c.status}" data-act="pbChoose" data-arg="${esc(c.event)}" ${c.status === "open" ? "" : "disabled"}>
-            <span class="puzzle">${puzzleIcon(c.event)}</span>${esc(puzzleName(c.event, true))}
-            ${c.status === "open" ? "" : ` · ${c.status}${c.side ? " " + c.side.toUpperCase() : ""}`}</button>`).join("")}</div>
-        <div class="r">${btn("Undo last", "pbUndo")}${btn("Start over", "pbReset")}${btn("Show pick & ban page", "scene", "pickban", "primary")}</div>`, "wide")
-      + box("Puzzle pool", `
-        <p class="hint">Tick 5 to 7 puzzles. Changing the pool restarts the pick & ban.</p>
-        <div class="pool">${Object.keys(PUZZLES).map((id) =>
-          `<label class="check"><input type="checkbox" data-act="pbPool" data-arg="${id}" ${(pb.pool || []).includes(id) ? "checked" : ""}>${esc(puzzleName(id, true))}</label>`).join("")}</div>`)
-      + box("Turn order", `
-        <p class="hint">Side and action for each turn, in order. Whatever is left untouched at the end is the decider.</p>
-        ${field("Order", "pickban.sequence", `data-type="csv"`)}
-        <div class="r">${btn("Standard order, A first", "pbSequence", "a")}${btn("Standard order, B first", "pbSequence", "b")}</div>`);
-  }],
-
-  bracket: ["Bracket", () => {
-    const b = S.bracket || {};
-    const setup = box("Bracket setup", `
-        <div class="r">${select("Format", "bracket.format", [["single", "Single elimination"], ["double", "Double elimination"], ["swiss", "Swiss"]])}
-          ${field("Page title", "bracket.title")}</div>
-        <label>Entrants, one per line, best seed first
-          <textarea data-path="bracket.entrants" data-type="lines">${esc((b.entrants || []).join("\n"))}</textarea></label>
-        <div class="r">${btn("Use team names", "entrantsFrom", "teams")}${btn("Use competitor names", "entrantsFrom", "competitors")}
-          ${btn("Clear all results", "bracketReset", "", "alert")}</div>
-        <p class="hint">Changing entrants or format after results are in can move people around. Clear results if it looks wrong.</p>`);
-
-    const row = (id, a, b2, base, won) => `<div class="m">
-        <span class="id">${esc(id)}</span><span class="nm r2">${esc(a)}</span>
-        <input data-path="${base}.sa" value="${esc(val(`${base}.sa`))}"><input data-path="${base}.sb" value="${esc(val(`${base}.sb`))}">
-        <span class="nm">${esc(b2)}</span>
-        <span class="r">${btn("◀ Won", "winner", `${base}:a`, won === "a" ? "on" : "")}${btn("Won ▶", "winner", `${base}:b`, won === "b" ? "on" : "")}</span>
-      </div>`;
-
-    let results;
-    if (b.format === "swiss") {
-      const rounds = b.swissRounds || [];
-      results = box("Swiss rounds", `
-        <div class="r">${btn("Pair next round", "swissNext", "", "primary")}${btn("Delete last round", "swissUndo")}</div>
-        <p class="hint">Finish every match in a round before pairing the next one. The page shows the newest round.</p>
-        ${rounds.map((round, r) => `<h3>Round ${r + 1}</h3>` + round.map((m, i) =>
-          m.b ? row(`${r + 1}.${i + 1}`, m.a, m.b, `bracket.swissRounds.${r}.${i}`, m.winner)
-              : `<div class="m"><span class="id">bye</span><span class="nm r2">${esc(m.a)}</span></div>`).join("")).reverse().join("")}`, "wide");
-    } else {
-      const built = buildElimination(b.format, b.entrants || [], b.results || {});
-      results = box("Results", built.sections.map((sec) =>
-        (sec.title ? `<h3>${esc(sec.title)}</h3>` : "") + sec.rounds.map((round) =>
-          `<h3>${esc(round.title)}</h3>` + round.matches.map((m) =>
-            m.a.bye || m.b.bye ? "" :
-            m.a.pending || m.b.pending ? `<div class="m"><span class="id">${m.id}</span><span class="nm r2 hint">waiting</span></div>` :
-            row(m.id, m.a.name, m.b.name, `bracket.results.${m.id}`, m.won)).join("")).join("")).join(""), "wide");
-    }
-    return setup + results;
-  }],
-
-  people: ["People & teams", () => {
-    const teamOf = (id) => teams().find(([, t]) => (t.members || []).includes(id))?.[1].name || "no team";
-    const person = ([id, p]) => fold(id, p.name, [p.wcaId, teamOf(id)].filter(Boolean).join(" · "), `
-        <div class="r">${field("Name", `competitors.${id}.name`)}${field("WCA ID", `competitors.${id}.wcaId`)}</div>
-        <div class="r">${field("Program", `competitors.${id}.program`)}${select("Main event", `competitors.${id}.mainEvent`, puzzleOptions())}</div>
-        <div class="r">${field("Photo (URL, or assets/photos/file.jpg)", `competitors.${id}.photo`)}${field("One-line bio", `competitors.${id}.bio`)}</div>
-        ${Object.keys(p.events || {}).map((ev) => `<div class="r">
-          <span style="width:110px;font-weight:700">${esc(puzzleName(ev, true))}</span>
-          ${field("Single", `competitors.${id}.events.${ev}.single`)}${field("Average", `competitors.${id}.events.${ev}.average`)}
-          ${btn("✕", "delPath", `competitors.${id}.events.${ev}`, "quiet")}</div>`).join("")}
-        <div class="r">
-          <select data-act="addEvent" data-arg="${id}" style="width:auto"><option value="">+ Add a puzzle…</option>
-            ${puzzleOptions().filter(([ev]) => !p.events?.[ev]).map(([v, t]) => `<option value="${v}">${esc(t)}</option>`).join("")}</select>
-          ${btn("Show on competitor page", "showCompetitor", id)}${btn("Delete person", "delPerson", id, "quiet")}</div>`);
-    const team = ([id, t]) => fold(id, t.name, `${(t.members || []).length} members`, `
-        <div class="r">${field("Team name", `teams.${id}.name`)}${field("Short tag", `teams.${id}.tag`, `maxlength="4"`)}${field("Record", `teams.${id}.record`)}</div>
-        <div class="r">${field("Motto", `teams.${id}.motto`)}${field("Logo (URL or path)", `teams.${id}.logo`)}</div>
-        <div class="pool">${people().map(([pid, p]) =>
-          `<label class="check"><input type="checkbox" data-act="member" data-arg="${id}:${pid}" ${(t.members || []).includes(pid) ? "checked" : ""}>${esc(p.name)}</label>`).join("")}</div>
-        <div class="r">${btn("Show on team page", "showTeam", id)}${btn("Delete team", "delTeam", id, "quiet")}</div>`);
-    return box("Teams", teams().map(team).join("") + `<div class="r">${btn("+ Add team", "addTeam", "", "primary")}</div>`)
-      + box("Competitors", people().map(person).join("") + `<div class="r">${btn("+ Add competitor", "addPerson", "", "primary")}</div>`);
-  }],
-
-  setup: ["Setup & links", () => {
-    const base = new URL("../frames/", location.href).href;
-    return box("Frame links", `
-        <p class="hint">In OBS: add a <b>Browser</b> source, paste a link, set width 1920 and height 1080. Hollow frames go above your camera sources.
-          Add <code>?bg=green</code> for a chroma-key background in post editing (use <code>&amp;bg=green</code> if the link already has a <code>?</code>).</p>
-        ${FRAMES.map(([file, name, note]) => `<div class="url"><b>${name}</b><code>${base}${file}</code>
-          ${btn("Copy", "copy", base + file)}<a href="${base}${file}" target="_blank">Open</a></div><p class="hint">${note}</p>`).join("")}`, "wide")
-      + box("Save and load", `
-        <p class="hint">Everything you enter is saved automatically in <code>data/state.json</code>. Export a copy before an event, or to reuse a roster.</p>
-        <div class="r">${btn("Export to file", "export", "", "primary")}<label>Import from file<input type="file" id="import" accept=".json"></label></div>
-        <div class="r">${btn("Reset everything to the sample data", "resetAll", "", "alert")}</div>`);
-  }],
-};
-
-// ---------- Actions ----------
-
-const autoClear = () => Number(localStorage.getItem("uwcc-autoclear") || 0);
-const clearTimers = {};
+const TABS = [live, bracket, people, settings, links];
 
 const ACTIONS = {
-  scene: (id) => store.set("program.scene", id),
-  score: (arg) => {
-    const [key, delta] = arg.split(":");
-    store.set(`match.${key}`, Math.max(0, (Number(S.match?.[key]) || 0) + Number(delta)));
+  // data-arg='some.path=<json>' saves that value. Used by every switch.
+  set(arg) {
+    const at = arg.indexOf("=");
+    store.set(arg.slice(0, at), JSON.parse(arg.slice(at + 1)));
   },
-  // Switching kind puts the first two teams (or players) on the two sides.
-  matchMode: (mode) => {
-    const ids = (mode === "solo" ? people() : teams()).map(([id]) => id);
-    const fits = (id) => ids.includes(id);
-    const a = fits(S.match?.a) ? S.match.a : ids[0] || "";
-    const b = fits(S.match?.b) ? S.match.b : ids.find((id) => id !== a) || "";
-    store.patch([{ path: "match.mode", value: mode }, { path: "match.a", value: a }, { path: "match.b", value: b }]);
-  },
-  resetScore: () => store.patch([{ path: "match.scoreA", value: 0 }, { path: "match.scoreB", value: 0 }]),
-  swapSides: () => {
-    const m = S.match || {};
-    store.patch([{ path: "match.a", value: m.b }, { path: "match.b", value: m.a },
-      { path: "match.scoreA", value: m.scoreB }, { path: "match.scoreB", value: m.scoreA }]);
-  },
-  status: (arg) => {
-    const [slot, id] = arg.split(":");
-    store.set(`cameras.${slot}.status`, id);
-    clearTimeout(clearTimers[slot]);
-    if (id !== "none" && autoClear()) {
-      clearTimers[slot] = setTimeout(() => store.set(`cameras.${slot}.status`, "none"), autoClear() * 1000);
-    }
-  },
-  interTitle: (title) => store.set("intermission.title", title),
-
-  pbChoose: (event) => {
-    const next = pickbanStatus(S.pickban).next;
-    if (next) store.set("pickban.actions", [...(S.pickban.actions || []), { event, side: next.side, type: next.type }]);
-  },
-  pbUndo: () => store.set("pickban.actions", (S.pickban?.actions || []).slice(0, -1)),
-  pbReset: () => store.set("pickban.actions", []),
-  pbSequence: (first) => store.patch([
-    { path: "pickban.sequence", value: defaultSequence((S.pickban?.pool || []).length, first) },
-    { path: "pickban.actions", value: [] }]),
-  pbPool: (id, el) => {
-    const pool = Object.keys(PUZZLES).filter((p) => (p === id ? el.checked : (S.pickban?.pool || []).includes(p)));
-    store.patch([{ path: "pickban.pool", value: pool },
-      { path: "pickban.sequence", value: defaultSequence(pool.length) }, { path: "pickban.actions", value: [] }]);
-  },
-
-  winner: (arg) => {
-    const [base, side] = arg.split(":");
-    store.set(`${base}.winner`, getPath(S, `${base}.winner`) === side ? "" : side);
-  },
-  entrantsFrom: (kind) => store.set("bracket.entrants", Object.values(S[kind] || {}).map((x) => x.name)),
-  bracketReset: () => confirm("Clear every bracket result?") &&
-    store.patch([{ path: "bracket.results", value: {} }, { path: "bracket.swissRounds", value: [] }]),
-  swissNext: () => store.set("bracket.swissRounds",
-    [...(S.bracket.swissRounds || []), swissPair(S.bracket.entrants || [], S.bracket.swissRounds || [])]),
-  swissUndo: () => confirm("Delete the newest Swiss round?") &&
-    store.set("bracket.swissRounds", (S.bracket.swissRounds || []).slice(0, -1)),
-
-  addPerson: () => {
-    const id = newId("c");
-    opened.add(id);
-    store.set(`competitors.${id}`,
-      { name: "New competitor", wcaId: "", program: "", bio: "", photo: "", mainEvent: "333", events: { "333": { single: "", average: "" } } });
-  },
-  addTeam: () => {
-    const id = newId("t");
-    opened.add(id);
-    store.set(`teams.${id}`, { name: "New team", tag: "", logo: "", motto: "", record: "", members: [] });
-  },
-  delTeam: (id) => confirm(`Delete ${nameOf(id)}?`) && store.set(`teams.${id}`, null),
-  addEvent: (id, el) => el.value && store.set(`competitors.${id}.events.${el.value}`, { single: "", average: "" }),
-  delPath: (path) => store.set(path, null),
-  delPerson: (id) => confirm(`Delete ${nameOf(id)}?`) && store.patch([
-    { path: `competitors.${id}`, value: null },
-    ...teams().filter(([, t]) => (t.members || []).includes(id))
-      .map(([tid, t]) => ({ path: `teams.${tid}.members`, value: t.members.filter((m) => m !== id) }))]),
-  member: (arg, el) => {
-    const [tid, pid] = arg.split(":");
-    const members = (S.teams[tid].members || []).filter((m) => m !== pid);
-    store.set(`teams.${tid}.members`, el.checked ? [...members, pid] : members);
-  },
-  showCompetitor: (id) => store.patch([{ path: "program.competitor", value: id }, { path: "program.scene", value: "competitor" }]),
-  showTeam: (id) => store.patch([{ path: "program.team", value: id }, { path: "program.scene", value: "team" }]),
-
-  copy: (text, el) => navigator.clipboard.writeText(text).then(() => { el.textContent = "Copied"; }),
-  export: () => {
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([JSON.stringify(S, null, 2)], { type: "application/json" }));
-    a.download = "uw-cubing-overlay-state.json";
-    a.click();
-  },
-  resetAll: () => confirm("Replace everything with the sample data? This cannot be undone.") && store.reset(),
 };
+for (const tab of TABS) {
+  for (const [name, fn] of Object.entries(tab.actions || {})) {
+    if (ACTIONS[name]) console.warn(`Two tabs define the action "${name}"; the one in "${tab.id}" wins.`);
+    ACTIONS[name] = fn;
+  }
+}
 
-// ---------- Wiring ----------
+const $ = (sel) => document.querySelector(sel);
+const app = $("#app"), top = $("#top"), onair = $("#onair");
+const frame = $("#preview iframe");
+let tabId = location.hash.slice(1) || TABS[0].id;
+
+// ---------- Saving and actions ----------
 
 function readInput(el) {
   if (el.type === "checkbox") return el.checked;
@@ -318,38 +45,58 @@ function readInput(el) {
   return el.value;
 }
 
-app.addEventListener("change", (e) => {
+const run = (el) => ACTIONS[el.dataset.act]?.(el.dataset.arg, el);
+
+document.addEventListener("change", (e) => {
   const el = e.target;
-  if (el.id === "autoclear") return localStorage.setItem("uwcc-autoclear", el.value);
-  if (el.id === "import") {
-    return el.files[0]?.text().then((text) => store.replace(JSON.parse(text))).catch(() => alert("That file is not valid JSON."));
-  }
-  if (el.dataset.act) return ACTIONS[el.dataset.act](el.dataset.arg, el);
+  if (el.dataset.act) return run(el);
   if (el.dataset.path) store.set(el.dataset.path, readInput(el));
 });
 
-app.addEventListener("click", (e) => {
+document.addEventListener("click", (e) => {
+  const tab = e.target.closest("button[data-tab]");
+  if (tab) { tabId = tab.dataset.tab; location.hash = tabId; return render(); }
   const el = e.target.closest("button[data-act]");
-  if (el) ACTIONS[el.dataset.act](el.dataset.arg, el);
+  if (el) run(el);
 });
+
+// Enter in a text field saves it straight away.
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && e.target.matches("input[data-path]")) e.target.blur();
+});
+
+// <details> does not bubble its toggle event, so listen on the way down.
+app.addEventListener("toggle", (e) => {
+  const key = e.target.dataset?.fold;
+  if (key) opened[e.target.open ? "add" : "delete"](key);
+}, true);
+
+// ---------- Drawing ----------
 
 // Redraw the tab, keeping the cursor where it was if a field is being edited.
 function render() {
   if (!S) return;
-  if (!TABS[tab]) tab = "live";
+  const tab = TABS.find((t) => t.id === tabId) || TABS[0];
+  tabId = tab.id;
+
   const active = document.activeElement;
   const key = active?.dataset?.path;
   const keep = key && { value: active.value, start: active.selectionStart, end: active.selectionEnd };
   const button = active?.tagName === "BUTTON" && active.dataset.act
     ? `button[data-act="${active.dataset.act}"][data-arg="${CSS.escape(active.dataset.arg || "")}"]` : "";
 
-  document.querySelector("#tabs").innerHTML = Object.entries(TABS).map(([id, [name]]) =>
-    `<button data-tab="${id}" class="${id === tab ? "on" : ""}">${name}</button>`).join("");
-  document.querySelector("#conn").textContent = store.online ? "Connected" : "No server: this browser only";
-  app.innerHTML = TABS[tab][1]();
+  $("#tabs").innerHTML = TABS.map((t) =>
+    `<button data-tab="${t.id}" class="${t.id === tabId ? "on" : ""}">${t.title}</button>`).join("");
+  $("#conn").textContent = store.online ? "Connected" : "No server: this browser only";
+  $("#conn").classList.toggle("off", !store.online);
+
+  onair.hidden = !tab.top;
+  top.innerHTML = tab.top?.() || "";
+  app.innerHTML = tab.render();
+  showPreview(tab.preview?.());
 
   if (keep) {
-    const el = app.querySelector(`[data-path="${CSS.escape(key)}"]`);
+    const el = document.querySelector(`[data-path="${CSS.escape(key)}"]`);
     if (el && el.type !== "checkbox") {
       el.focus();
       if (el.tagName !== "SELECT") {
@@ -358,26 +105,29 @@ function render() {
       }
     }
   }
-  if (button) app.querySelector(button)?.focus();
+  if (button) document.querySelector(button)?.focus();
 }
 
-// <details> does not bubble its toggle event, so listen on the way down.
-app.addEventListener("toggle", (e) => {
-  const key = e.target.dataset?.fold;
-  if (key) opened[e.target.open ? "add" : "delete"](key);
-}, true);
-
-document.querySelector("#tabs").addEventListener("click", (e) => {
-  const id = e.target.dataset.tab;
-  if (id) { tab = id; location.hash = id; render(); }
-});
+// The preview is a real frame, so it is only reloaded when it has to show
+// something else. Leaving the tab unloads it.
+function showPreview(view) {
+  const src = view ? new URL(view.src, location.href).href : "about:blank";
+  if (frame.dataset.src !== src) {
+    frame.dataset.src = src;
+    frame.src = src;
+  }
+  $("#preview").classList.toggle("live", Boolean(view?.live));
+  $("#preview .cap").textContent = view?.caption || "";
+}
 
 // Drawn on the next tick so that, when you Tab out of a field, the focus has
 // already landed on the next field and can be kept there.
 let queued = false;
-store.subscribe((state) => {
-  S = state;
+function schedule() {
   if (queued) return;
   queued = true;
   setTimeout(() => { queued = false; render(); }, 0);
-});
+}
+
+onRedraw(schedule);
+store.subscribe((state) => { setState(state); schedule(); });

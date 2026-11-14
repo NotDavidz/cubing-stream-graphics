@@ -29,9 +29,6 @@ export const field = (label, path, attrs = "") =>
 export const number = (label, path, attrs = "") =>
   field(label, path, `type="number" data-type="number" min="0" ${attrs}`);
 
-export const check = (label, path, fallback = false) =>
-  `<label class="check"><input type="checkbox" data-path="${esc(path)}" ${(getPath(S, path) ?? fallback) ? "checked" : ""}>${label}</label>`;
-
 // options = [[value, text]]; "— choose —" is shown while nothing matches.
 export function optionList(options, current) {
   current = String(current ?? "");

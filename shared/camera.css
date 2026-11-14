@@ -28,11 +28,10 @@
 .cam .bulge .what { flex: 0 1 auto; }
 .cam .bulge .puzzle { color: var(--ink); }
 .cam .bulge .num {
-  background: var(--ink); color: var(--y-gold);
+  background: var(--ink); color: var(--white);
   min-width: 48px; height: 44px; padding: 0 8px;
   display: flex; align-items: center; justify-content: center; font-size: 32px;
 }
-.cam .bulge .num.b { color: var(--y-pale); }
 .cam .bulge .sep { width: 4px; height: 34px; background: var(--ink); }
 
 /* Name plate in the top-left corner of the window. */
@@ -41,13 +40,10 @@
   display: flex; align-items: stretch; height: 58px; max-width: calc(100% - 440px);
   font-weight: 800; text-transform: uppercase; white-space: nowrap;
 }
-.cam .plate .nm { min-width: 0; }
+.cam .plate .nm { min-width: 0; background: var(--ink); color: var(--edge); padding: 0 20px; font-size: 30px; display: flex; align-items: center; gap: 14px; }
 .cam .plate .nm span, .cam .plate .nm small { overflow: hidden; text-overflow: ellipsis; }
-.cam .plate .nm small { flex: none; max-width: 40%; }
-.cam .plate .time { flex: none; }
-.cam .plate .nm { background: var(--ink); color: var(--edge); padding: 0 20px; font-size: 30px; display: flex; align-items: center; gap: 14px; }
-.cam .plate .nm small { color: var(--white); font-size: 18px; letter-spacing: 2px; }
-.cam .plate .time { background: var(--edge); color: var(--ink); padding: 0 18px; font-size: 34px; display: flex; align-items: center; font-variant-numeric: tabular-nums; }
+.cam .plate .nm small { flex: none; max-width: 40%; color: var(--white); font-size: 18px; letter-spacing: 2px; }
+.cam .plate .time { flex: none; background: var(--edge); color: var(--ink); padding: 0 18px; font-size: 34px; display: flex; align-items: center; font-variant-numeric: tabular-nums; }
 
 /* Status burst: "+2", "DNF", "WIN"... pops into the top-right corner. */
 .cam .burst {
@@ -64,8 +60,7 @@
 .cam.alert { --edge: var(--alert); }
 .cam.alert .edge { box-shadow: 0 0 40px 8px rgba(226, 59, 46, .75), inset 0 0 60px 10px rgba(226, 59, 46, .65); animation: alarm 1s ease-in-out infinite; }
 .cam.alert .burst { background: var(--alert); color: var(--white); }
-.cam.alert .bulge, .cam.alert .plate .time { color: var(--white); }
-.cam.alert .bulge .puzzle { color: var(--white); }
+.cam.alert .bulge, .cam.alert .bulge .puzzle, .cam.alert .plate .time { color: var(--white); }
 @keyframes alarm {
   0%, 100% { box-shadow: 0 0 26px 4px rgba(226, 59, 46, .55), inset 0 0 40px 6px rgba(226, 59, 46, .5); }
   50%      { box-shadow: 0 0 60px 12px rgba(226, 59, 46, .95), inset 0 0 90px 18px rgba(226, 59, 46, .85); }
@@ -77,20 +72,34 @@
   height: 90px; background: var(--y-gold); color: var(--ink);
   display: grid; grid-template-columns: 1fr auto auto auto 1fr; align-items: center; gap: 22px;
   padding: 0 16px; font-weight: 800; text-transform: uppercase; white-space: nowrap;
+  overflow: hidden;        /* trims the bright half behind a winner's score */
 }
 .scorebar .team { display: flex; align-items: center; gap: 16px; font-size: 40px; min-width: 0; overflow: hidden; }
 .scorebar .team.b { flex-direction: row-reverse; text-align: right; }
 .scorebar .team span { flex: 1; }
 .scorebar .team .avatar { background: var(--ink); color: var(--y-gold); }
 .scorebar .num {
-  width: 84px; height: 70px; background: var(--ink); color: var(--y-gold);
+  width: 84px; height: 70px; background: var(--ink); color: var(--white);
   display: flex; align-items: center; justify-content: center; font-size: 54px;
 }
-.scorebar .num.b { color: var(--y-pale); }
 .scorebar .mid { display: flex; align-items: center; gap: 14px; font-size: 20px; line-height: 1.15; letter-spacing: 1px; min-width: 190px; max-width: 380px; justify-content: center; }
 .scorebar .mid > div { min-width: 0; }
-.scorebar .mid .puzzle { flex: none; }
-.scorebar .mid .puzzle { color: var(--ink); }
+.scorebar .mid .puzzle { flex: none; color: var(--ink); }
+
+/* Match won: the winner's half turns bright, score included, and a shine runs
+   across the name once; the other half steps back. The margins stretch the
+   colour to the bar's edge and half way into the gap, where the score's meets it. */
+.scorebar .num.won { background: var(--y-bright); color: var(--ink); box-shadow: 0 0 0 12px var(--y-bright); }
+.scorebar .team.won { position: relative; align-self: stretch; background: var(--y-bright); }
+.scorebar .team.a.won { margin: 0 -11px 0 -16px; padding: 0 11px 0 16px; }
+.scorebar .team.b.won { margin: 0 -16px 0 -11px; padding: 0 16px 0 11px; }
+.scorebar .team.won::after {
+  content: ""; position: absolute; top: 0; bottom: 0; left: -160px; width: 90px;
+  background: rgba(255, 255, 255, .8); transform: skewX(-24deg);
+  animation: shine 1.1s .2s ease-out;
+}
+.scorebar .team.lost { opacity: .45; }
+@keyframes shine { to { left: 110%; } }
 
 /* ---------- Result plate under a camera (two-camera frame) ---------- */
 
@@ -99,8 +108,8 @@
   display: flex; align-items: center; gap: 18px; padding: 0 20px 0 0;
   font-weight: 800; text-transform: uppercase; white-space: nowrap;
 }
-.result .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 34px; color: var(--y-gold); }
+.result .nm { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 34px; color: var(--y-gold); }
 .result.b .nm { color: var(--y-pale); }
-.result small { font-size: 18px; letter-spacing: 2px; color: var(--white); flex: 0 1 auto; min-width: 0; max-width: 30%; overflow: hidden; text-overflow: ellipsis; }
+.result small { font-size: 18px; letter-spacing: 2px; color: var(--white); flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .result > * { flex: none; }
 .result .time { font-size: 46px; color: var(--white); font-variant-numeric: tabular-nums; }

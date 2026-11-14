@@ -3,12 +3,11 @@
     "title": "UW Cubing League",
     "subtitle": "Fall 2026",
     "round": "Semifinal",
-    "puzzle": "333",
-    "format": "",
-    "location": "MC 2038"
+    "puzzle": "333"
   },
-  "settings": { "transition": "sweep", "autoClear": 0 },
-  "program": { "scene": "versus", "competitor": "c1", "team": "t1", "camSlot": "a", "bugPos": "top" },
+  "settings": { "transition": "sweep", "autoClear": 0, "ticker": { "on": false, "seconds": 10, "lines": [] } },
+  "program": { "scene": "versus", "competitor": "c1", "team": "t1", "camSlot": "a", "bugPos": "top", "bugSolvers": true, "bugHistory": true,
+               "cycle": { "competitor": { "seconds": 0, "since": 0 }, "team": { "seconds": 0, "since": 0 } } },
   "competitors": {
     "c1": { "name": "Sample Solver One", "wcaId": "2019SAMP01", "program": "Math, 3B", "bio": "Club champion, Winter 2026.", "mainEvent": "333",
             "photo": "", "events": { "333": { "single": "6.52", "average": "8.14" }, "222": { "single": "1.31", "average": "2.60" }, "pyram": { "single": "2.10", "average": "3.85" }, "sq1": { "single": "9.87", "average": "12.40" } } },
@@ -27,8 +26,8 @@
     "t1": { "name": "Team Geese", "tag": "GSE", "logo": "", "motto": "Honk if you sub-10.", "record": "3 - 1", "members": ["c1", "c2", "c3"] },
     "t2": { "name": "Team Cubers", "tag": "CUB", "logo": "", "motto": "Full step ahead.", "record": "2 - 2", "members": ["c4", "c5", "c6"] }
   },
-  "match": { "mode": "team", "a": "t1", "b": "t2", "scoreA": 0, "scoreB": 0, "bestOf": 5, "show": true },
-  "victory": { "winner": "auto", "title": "Winner", "note": "" },
+  "match": { "mode": "team", "a": "t1", "b": "t2", "scoreA": 0, "scoreB": 0, "bestOf": 5, "show": true, "celebrate": true, "solves": [] },
+  "victory": { "winner": "auto", "title": "", "note": "" },
   "cameras": {
     "a": { "competitor": "c1", "status": "none", "time": "" },
     "b": { "competitor": "c4", "status": "none", "time": "" }
@@ -40,6 +39,7 @@
   },
   "bracket": {
     "format": "single",
+    "thirdPlace": true,
     "title": "Playoffs",
     "entrants": ["Team Geese", "Team Cubers", "Team Three", "Team Four", "Team Five", "Team Six", "Team Seven", "Team Eight"],
     "results": {},

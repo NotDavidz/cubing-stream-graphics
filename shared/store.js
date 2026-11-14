@@ -45,6 +45,13 @@ function createStore() {
   let online = false;
   let rev = -1;            // server revision of the state we hold
   let channel = null;
+  let status = "ok";       // "lost" while the server cannot be reached
+
+  function setStatus(next) {
+    if (status === next) return;
+    status = next;
+    if (state) emit();
+  }
 
   function emit() {
     for (const fn of listeners) {
@@ -65,9 +72,10 @@ function createStore() {
   async function send(name, body) {
     try {
       await post(name, body);
+      setStatus("ok");
     } catch (err) {
       console.error(err);
-      await pull().catch(() => {});
+      await pull().then(() => setStatus("ok"), () => setStatus("lost"));
     }
   }
 
@@ -90,6 +98,8 @@ function createStore() {
       // ?still=1 is a one-off snapshot (still exports), so no live connection.
       if (new URLSearchParams(location.search).has("still")) return emit();
       const events = new EventSource(api("events"));
+      events.onerror = () => setStatus("lost");      // it keeps retrying by itself
+      events.onopen = () => setStatus("ok");
       events.onmessage = (e) => {
         const next = JSON.parse(e.data);
         if (next.rev === rev) return;      // the copy sent on connect; already drawn
@@ -109,6 +119,7 @@ function createStore() {
   const store = {
     get state() { return state; },
     get online() { return online; },
+    get status() { return status; },
 
     subscribe(fn) {
       listeners.add(fn);
@@ -155,6 +166,7 @@ function borrow(host) {
   return {
     get state() { return host.state; },
     get online() { return host.online; },
+    get status() { return host.status; },
     subscribe(fn) {
       const off = host.subscribe(fn);
       addEventListener("pagehide", off);     // stop listening once this frame is gone

@@ -17,7 +17,7 @@ export const SCENES = [
   { id: "bracket", name: "Bracket", kind: "solid", note: "Single elimination, double elimination or Swiss" },
   { id: "competitor", name: "Competitor", kind: "solid", note: "One person. Add ?id=c1 to pin one person" },
   { id: "team", name: "Team", kind: "solid", note: "One team and its members. Add ?id=t1 to pin one team" },
-  { id: "victory", name: "Victory", kind: "solid", note: "The winning team or person" },
+  { id: "victory", name: "Champion", kind: "solid", note: "The team or person who won the event" },
   { id: "cam-versus", name: "Two cameras", kind: "hollow", note: "Head to head: two camera windows and the score bar" },
   { id: "cam-solo", name: "One camera", kind: "hollow", note: "Thin frame around one camera",
     variants: [["?slot=a", "Camera A, pinned"], ["?slot=b", "Camera B, pinned"]] },

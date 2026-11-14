@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Victory</title>
+<title>Event champion</title>
 <link rel="stylesheet" href="../shared/theme.css">
 <style>
   main { display: flex; flex-direction: column; gap: 22px; }
@@ -24,28 +24,13 @@
   .result .beat { min-width: 0; font-size: 34px; font-weight: 800; text-transform: uppercase; }
   .result .beat .label { display: block; }
 
-  /* Who is on the winning team, or the winner's own details. */
+  /* The members of a winning team: photo and name, nothing else. */
   .roster { flex: none; height: 150px; display: flex; gap: 16px; }
   .roster:empty { display: none; }
   .chip { flex: 1; min-width: 0; display: flex; align-items: center; gap: 20px; padding: 0 24px; }
-  .chip h3 { font-size: 30px; font-weight: 800; line-height: 1.1; text-transform: uppercase; color: var(--y-gold); }
-  .chip .label { display: block; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .chip > div:last-child { min-width: 0; flex: 1; }
-  .chip.fact { flex-direction: column; align-items: flex-start; justify-content: center; gap: 4px; }
-  .chip.fact b { font-size: 40px; font-weight: 800; white-space: nowrap; }
+  .chip h3 { flex: 1; min-width: 0; font-size: 30px; font-weight: 800; line-height: 1.1; text-transform: uppercase; color: var(--y-gold); }
 
-  /* Triangles falling behind the winner, the same shape as the background pattern. */
-  .confetti { position: absolute; inset: 0; pointer-events: none; }
-  .hero > .avatar { position: relative; }
-  .confetti i { position: absolute; top: -40px; width: 0; height: 0;
-                border-left: var(--s) solid transparent; border-right: var(--s) solid transparent; border-top: calc(var(--s) * 1.8) solid var(--c);
-                animation: fall var(--t) var(--d) linear infinite; opacity: 0; }
-  @keyframes fall {
-    0%   { transform: translateY(0) rotate(0deg); opacity: 0; }
-    8%   { opacity: .9; }
-    100% { transform: translateY(640px) rotate(var(--r)); opacity: .9; }
-  }
-  .still .confetti { display: none; }
+  .hero > .avatar { position: relative; }      /* above the confetti */
 </style>
 </head>
 <body>
@@ -60,60 +45,43 @@
 <script type="module">
 import { store } from "../shared/store.js";
 import { victoryInfo } from "../shared/match.js";
-import { initStage, paint, esc, avatar, puzzle, banner, eventInfobar, puzzleName } from "../shared/ui.js";
+import { initStage, paint, esc, avatar, banner, eventInfobar, puzzleName, confetti } from "../shared/ui.js";
 
+// The winner of the whole event. (Winning a single match is celebrated on
+// the Versus page instead.)
 initStage();
 
-// Scatter the confetti once. Positions come from a fixed sequence, not
-// Math.random, so every screen showing this frame looks the same.
-const COLOURS = ["#fae203", "#ecc13c", "#eae6a3", "#c8961e"];
-const CONFETTI = `<div class="confetti">${Array.from({ length: 46 }, (_, i) => {
-  const spread = (i * 0.618034) % 1, other = (i * 0.414214) % 1;
-  return `<i style="left:${(spread * 100).toFixed(1)}%;--s:${8 + Math.round(other * 12)}px;--c:${COLOURS[i % 4]};` +
-    `--t:${(4.5 + other * 4).toFixed(2)}s;--d:${(-spread * 8 + (i % 3)).toFixed(2)}s;--r:${i % 2 ? 320 : -280}deg"></i>`;
-}).join("")}</div>`;
-
-// Team winners list their members; a single winner shows their own details.
-function roster(state, w) {
-  if (w.kind === "team") {
-    return w.members.map((m, i) => `<div class="chip panel rise" style="animation-delay:${0.6 + i * 0.08}s">
-        ${avatar(m, 100)}
-        <div><h3 data-fit="wrap">${esc(m.name)}</h3>
-          <span class="label">${esc([m.wcaId, puzzleName(m.mainEvent, true)].filter(Boolean).join(" · "))}</span></div>
-      </div>`).join("");
-  }
-  const p = state.competitors?.[w.id] || {};
-  const ev = state.event?.puzzle, pb = p.events?.[ev] || {};
-  const name = puzzleName(ev, true);
-  return [["Team", w.team], ["WCA ID", p.wcaId], [`${name} single`, pb.single], [`${name} average`, pb.average]]
-    .filter(([, v]) => v)
-    .map(([k, v], i) => `<div class="chip fact panel rise" style="animation-delay:${0.6 + i * 0.08}s">
-        <span class="label">${esc(k)}</span><b data-fit="line">${esc(v)}</b></div>`).join("");
+// A winning team lists its members. A single winner needs nothing more: the
+// page is theirs.
+function roster(w) {
+  return w.members.map((m, i) => `<div class="chip panel rise" style="animation-delay:${0.6 + i * 0.08}s">
+      ${avatar(m, 100)}<h3 data-fit="wrap">${esc(m.name)}</h3></div>`).join("");
 }
 
 store.subscribe((state) => {
   const v = state.victory || {};
   const { winner, loser, score } = victoryInfo(state);
   const e = state.event || {};
-  paint(".banner", banner(v.title || "Winner", [e.round, puzzleName(e.puzzle)].filter(Boolean).join(" · ")));
+  const plural = winner?.kind === "team";
+  paint(".banner", banner(v.title || (plural ? "Champions" : "Champion"), [e.subtitle, puzzleName(e.puzzle)].filter(Boolean).join(" · ")));
   paint(".infobar", eventInfobar(state));
   if (!winner) {
-    paint("#hero", `<div class="empty label">The winner appears here once a side takes the lead</div>`);
+    paint("#hero", `<div class="empty label">The champion appears here once one is chosen</div>`);
     return paint("#roster", "");
   }
   paint("#hero", `
-    ${CONFETTI}
+    ${confetti()}
     ${avatar(winner, 330)}
     <div class="text">
-      <span class="tag">${esc(winner.kind === "team" ? "Winning team" : "Winner")}</span>
+      <span class="tag">${esc(e.title || "Event")} ${plural ? "champions" : "champion"}</span>
       <div class="name" data-fit="line">${esc(winner.name)}</div>
       ${v.note ? `<div class="note" data-fit="line">${esc(v.note)}</div>` : ""}
       ${score ? `<div class="result">
           <div class="nums"><b>${score[0]}</b><i>${score[1]}</i></div>
-          <div class="beat"><span class="label">Defeated</span><span data-fit="line">${esc(loser.name)}</span></div>
+          <div class="beat"><span class="label">Defeated in the final</span><span data-fit="line">${esc(loser.name)}</span></div>
         </div>` : ""}
     </div>`);
-  paint("#roster", roster(state, winner));
+  paint("#roster", roster(winner));
 });
 </script>
 </body>

@@ -37,13 +37,13 @@
 <script type="module">
 import { store } from "../shared/store.js";
 import { PUZZLES } from "../shared/puzzles.js";
-import { initStage, params, paint, esc, entity, avatar, puzzle, banner, eventInfobar, puzzleName } from "../shared/ui.js";
+import { initStage, params, paint, esc, entity, avatar, puzzle, banner, eventInfobar, puzzleName, shownId } from "../shared/ui.js";
 
 initStage();
 
 // Shows ?id=c1 if given, otherwise whoever the operator selected.
-store.subscribe((state) => {
-  const id = params.get("id") || state.program?.competitor;
+function draw(state) {
+  const id = params.get("id") || shownId(state, "competitor");
   const p = state.competitors?.[id];
   paint(".banner", banner("Competitor"));
   paint(".infobar", eventInfobar(state));
@@ -74,7 +74,13 @@ store.subscribe((state) => {
       <div class="label">Personal bests</div>
       <div class="events">${events}</div>
     </section>`);
-});
+}
+
+// Drawn again twice a second so auto-scroll (Live tab) can move on to the next
+// entry; nothing is repainted unless the entry actually changed.
+let latest = null;
+store.subscribe((state) => { latest = state; draw(state); });
+setInterval(() => latest && draw(latest), 500);
 </script>
 </body>
 </html>

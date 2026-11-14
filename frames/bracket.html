@@ -33,6 +33,11 @@
   .slot.lose { opacity: .5; }
   .slot.empty .nm { color: #666; }
 
+  /* Third place sits under the final, in the same column. */
+  .third { position: absolute; left: 0; right: 0; }
+  .third .label { display: block; font-size: 14px; height: 22px; text-align: center; }
+  .third .match { position: static !important; }
+
   .champion { flex: .8; }
   .champion .list { display: flex; flex-direction: column; justify-content: center; text-align: center; }
   .champion .box { background: var(--y-gold); color: var(--ink); padding: 14px 10px; font-size: 30px; font-weight: 800; text-transform: uppercase; line-height: 1.1; }
@@ -62,7 +67,7 @@
 </div>
 <script type="module">
 import { store } from "../shared/store.js";
-import { buildElimination, swissStandings } from "../shared/bracket.js";
+import { buildElimination, swissStandings, hasThirdPlace } from "../shared/bracket.js";
 import { initStage, paint, esc, banner, eventInfobar } from "../shared/ui.js";
 
 initStage();
@@ -120,15 +125,21 @@ function layout(sec) {
   }
   // A round made only of walkovers has nothing to show.
   const rounds = sec.rounds.filter((r) => r.matches.some((m) => !m.walkover));
-  return { title: sec.title, rounds, centre, units: Math.max(units, 1) };
+  return { title: sec.title, rounds, centre, units: Math.max(units, 1), third: sec.third };
 }
 
 function section(sec, unit, champion) {
   const height = sec.units * unit;
-  const rounds = sec.rounds.map((r) => `<div class="round">
+  // The third place match hangs a little below the final.
+  const final = sec.rounds.at(-1).matches[0];
+  const third = sec.third && !sec.third.walkover
+    ? `<div class="third" style="top:${(sec.centre.get(final.id) * unit + rowh + GAP / 2 + Math.min(40, unit * 0.2)).toFixed(1)}px">
+        <span class="label">Third place</span>${matchBox(sec.third)}</div>` : "";
+  const rounds = sec.rounds.map((r, i) => `<div class="round">
       <div class="label">${esc(r.title)}</div>
       <div class="list">${r.matches.filter((m) => !m.walkover).map((m) =>
-        matchBox(m, `data-id="${m.id}" style="top:${(sec.centre.get(m.id) * unit - rowh - GAP / 2).toFixed(1)}px"`)).join("")}</div>
+        matchBox(m, `data-id="${m.id}" style="top:${(sec.centre.get(m.id) * unit - rowh - GAP / 2).toFixed(1)}px"`)).join("")}${
+        i === sec.rounds.length - 1 ? third : ""}</div>
     </div>`).join("");
   const champ = champion === undefined ? "" : `<div class="round champion">
       <div class="label">&nbsp;</div>
@@ -168,7 +179,7 @@ function drawLines() {
 }
 
 function elimination(b) {
-  const built = buildElimination(b.format, b.entrants || [], b.results || {});
+  const built = buildElimination(b.format, b.entrants || [], b.results || {}, { thirdPlace: hasThirdPlace(b) });
   const sections = built.sections.map(layout);
   matches = new Map(built.sections.flatMap((s) => s.rounds.flatMap((r) => r.matches)).map((m) => [m.id, m]));
   const final = built.sections[0].rounds.at(-1).matches[0];

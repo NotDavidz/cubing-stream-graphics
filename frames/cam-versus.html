@@ -6,6 +6,9 @@
 <link rel="stylesheet" href="../shared/theme.css">
 <link rel="stylesheet" href="../shared/camera.css">
 <style>
+  /* The camera windows are at fixed positions, so this frame keeps the
+     header and footer where they have always been. */
+  .stage { --inset: 0px; }
   .top { position: absolute; left: 110px; right: 110px; top: 0; }
   .top .scorebar { animation: wipe .5s ease-out both; }
   .foot { position: absolute; left: 110px; right: 110px; bottom: 34px; margin: 0; }
@@ -59,9 +62,9 @@ store.subscribe((state) => {
     paint(`#result-${slot}`, `
       ${avatar(who, 78, slot)}
       <span class="nm">${esc(who.name)}</span>
-      ${who.team ? `<small>${esc(who.team)}</small>` : ""}
-      ${cam.time ? `<span class="time" data-k="time" data-v="${esc(cam.time)}">${esc(cam.time)}</span>` : ""}
-      ${status.label ? `<span class="tag ${status.tone === "alert" ? "alert" : ""}" data-k="status" data-v="${esc(status.label)}" style="font-size:26px">${esc(status.label)}</span>` : ""}`);
+      <small>${esc(who.team || "")}</small>
+      ${status.label ? `<span class="tag ${status.tone === "alert" ? "alert" : ""}" data-k="status" data-v="${esc(status.label)}" style="font-size:26px">${esc(status.label)}</span>` : ""}
+      ${cam.time ? `<span class="time" data-k="time" data-v="${esc(cam.time)}">${esc(cam.time)}</span>` : ""}`);
   }
 });
 </script>

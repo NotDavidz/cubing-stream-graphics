@@ -7,13 +7,23 @@
 <style>
   main { display: grid; grid-template-columns: minmax(0, 1fr) 440px minmax(0, 1fr); gap: 22px; }
 
-  .side { padding: 28px; display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+  .side { padding: 28px; display: flex; flex-direction: column; gap: 20px; min-width: 0; position: relative; overflow: hidden;
+          outline: 6px solid transparent; outline-offset: -6px;
+          transition: scale .5s cubic-bezier(.2, 1.5, .4, 1), outline-color .3s; }
+  .side > * { position: relative; }
   .side .head { display: flex; align-items: center; gap: 24px; }
   .side .head > div:last-child { flex: 1; min-width: 0; }
   .side .name { font-size: 50px; font-weight: 800; line-height: 1.05; text-transform: uppercase; color: var(--y-gold); }
   .side .detail { font-size: 22px; font-weight: 500; color: var(--white); margin-top: 6px; }
   .side-b .head { flex-direction: row-reverse; text-align: right; }
   .side-b .name { color: var(--y-pale); }
+
+  /* The side that has won the match: outlined, lifted a little towards the
+     viewer, with confetti falling behind its content. `scale` is used rather
+     than `transform` because the entry animation owns transform. */
+  .side.won { outline-color: var(--y-gold); scale: 1.035; z-index: 2; }
+  .side-b.won { outline-color: var(--y-pale); }
+  .side .confetti { position: absolute; --fall: 760px; }
 
   .rows { display: flex; flex-direction: column; gap: 10px; min-height: 0; overflow: hidden; }
   .row { display: flex; align-items: center; gap: 16px; background: var(--panel-2); padding: 10px 14px; font-size: 27px; font-weight: 600; }
@@ -27,8 +37,12 @@
   /* Each score gets half the panel and shrinks to fit, so 10 and up still fit. */
   .scores { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 14px; }
   .score { font-size: 190px; font-weight: 800; line-height: 190px; height: 190px; color: var(--white); }
-  .score.lead { color: var(--y-gold); }
   .vs { font-size: 40px; font-weight: 800; color: var(--y-gold); }
+  /* The "wins" tag sits in a row of no height, so the score does not move
+     when it appears. */
+  .centre .after { height: 0; display: flex; justify-content: center; align-items: flex-start; }
+  .centre .tag { font-size: 22px; padding: 5px 16px; background: var(--y-bright); }
+  .centre .tag.b { background: var(--y-pale); }
 
   /* One pip per win needed. The pips share the width, so a long series
      (first to 7, first to 10) gets narrower pips instead of spilling out. */
@@ -54,11 +68,11 @@
 <script type="module">
 import { store } from "../shared/store.js";
 import { matchInfo } from "../shared/match.js";
-import { initStage, paint, esc, avatar, puzzle, banner, eventInfobar, puzzleName } from "../shared/ui.js";
+import { initStage, paint, esc, avatar, puzzle, banner, eventInfobar, puzzleName, confetti, shortName } from "../shared/ui.js";
 
 initStage();
 
-function side(state, e, which) {
+function side(state, e, which, won) {
   let rows;
   if (e.kind === "team") {
     rows = e.members.map((m) => `<div class="row">
@@ -74,7 +88,7 @@ function side(state, e, which) {
     ].filter(([, v]) => v).map(([k, v]) =>
       `<div class="row"><span class="grow">${esc(k)}</span><span class="value">${esc(v)}</span></div>`).join("");
   }
-  return `<div class="head">${avatar(e, 170, which)}
+  return `${won ? confetti() : ""}<div class="head">${avatar(e, 170, which)}
       <div><div class="name" data-fit="wrap">${esc(e.name)}</div><div class="detail">${esc(e.kind === "team" ? e.detail : "")}</div></div>
     </div><div class="rows">${rows}</div>`;
 }
@@ -85,17 +99,23 @@ function pips(won, needed) {
 
 store.subscribe((state) => {
   const m = matchInfo(state);
+  // Once a side has the wins it needs, it is celebrated here (Settings > Match
+  // can switch that off). Winning the whole event has its own page.
+  const winner = m.cheer;
   paint(".banner", banner("Matchup", [state.event?.round, puzzleName(state.event?.puzzle)].filter(Boolean).join(" · ")));
-  paint("#a", side(state, m.a, "a"));
-  paint("#b", side(state, m.b, "b"));
+  for (const which of ["a", "b"]) {
+    document.querySelector(`#${which}`).classList.toggle("won", winner === which);
+    paint(`#${which}`, side(state, m[which], which, winner === which));
+  }
   paint("#centre", `
     <div class="label">Best of ${m.bestOf}<b>First to ${m.needed}</b></div>
     <div class="scores">
-      <div class="score ${m.leader === "a" ? "lead" : ""}" data-fit="line" data-k="a" data-v="${m.scoreA}">${m.scoreA}</div>
+      <div class="score" data-fit="line" data-k="a" data-v="${m.scoreA}">${m.scoreA}</div>
       <div class="vs">VS</div>
-      <div class="score ${m.leader === "b" ? "lead" : ""}" data-fit="line" data-k="b" data-v="${m.scoreB}">${m.scoreB}</div>
+      <div class="score" data-fit="line" data-k="b" data-v="${m.scoreB}">${m.scoreB}</div>
     </div>
-    <div class="pips ${m.needed > 6 ? "long" : ""}"><div class="a">${pips(m.scoreA, m.needed)}</div><div class="b">${pips(m.scoreB, m.needed)}</div></div>`);
+    <div class="pips ${m.needed > 6 ? "long" : ""}"><div class="a">${pips(m.scoreA, m.needed)}</div><div class="b">${pips(m.scoreB, m.needed)}</div></div>
+    <div class="after">${winner ? `<span class="tag ${winner} pop" data-fit="line">${esc(shortName(m[winner]))} wins</span>` : ""}</div>`);
   paint(".infobar", eventInfobar(state));
 });
 </script>

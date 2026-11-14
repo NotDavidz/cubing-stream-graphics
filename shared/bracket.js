@@ -31,14 +31,23 @@ function roundTitle(matchesInRound, prefix = "") {
   return `Round of ${matchesInRound * 2}`;
 }
 
-// format: "single" or "double". Returns
-//   { sections: [{ title, rounds: [{ title, matches: [match] }] }] }
+// The match for third place between the two losing semifinalists. Single
+// elimination only, and only once there are four entrants to have semifinals.
+export const THIRD = "3RD";
+export function hasThirdPlace(bracket = {}) {
+  return bracket.format !== "double" && bracket.format !== "swiss"
+    && bracket.thirdPlace !== false && (bracket.entrants || []).length >= 4;
+}
+
+// format: "single" or "double". options.thirdPlace adds the third place match
+// to a single elimination bracket. Returns
+//   { sections: [{ title, rounds: [{ title, matches: [match] }], third? }] }
 // where match = { id, a, b, sa, sb, won, winner, loser, walkover, feeders }
 // and a/b = { name, seed?, bye?, pending? }.
 //   won       "a" | "b" | ""
 //   walkover  one side is a bye, so there is nothing to play or draw
 //   feeders   [id | null, id | null]: the match whose winner fills slot a / b
-export function buildElimination(format, entrants, results = {}) {
+export function buildElimination(format, entrants, results = {}, options = {}) {
   const count = Math.max(entrants.length, format === "double" ? 4 : 2);
   const size = 2 ** Math.ceil(Math.log2(count));
   const wbRounds = Math.log2(size);
@@ -113,7 +122,15 @@ export function buildElimination(format, entrants, results = {}) {
     matches: ids.map(solve),
   }));
 
-  if (format !== "double") return { sections: [{ title: "", rounds: toRounds(wb) }] };
+  if (format !== "double") {
+    const section = { title: "", rounds: toRounds(wb) };
+    if (options.thirdPlace && wbRounds >= 2) {
+      const semis = wb[wbRounds - 2];
+      defs[THIRD] = semis.map((id) => ({ from: id, take: "loser" }));
+      section.third = solve(THIRD);
+    }
+    return { sections: [section] };
+  }
   const winners = toRounds(wb, "Winners R");
   winners.push({ title: "Grand Final", matches: [solve("GF")] });
   return {

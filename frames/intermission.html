@@ -6,15 +6,13 @@
 <link rel="stylesheet" href="../shared/theme.css">
 <style>
   main { display: flex; flex-direction: column; gap: 22px; }
-  .hero { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; text-align: center; }
+  .hero { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; text-align: center; padding: 0 40px; }
   .message { font-size: 44px; font-weight: 700; text-transform: uppercase; }
   .clock { font-size: 210px; font-weight: 800; line-height: 1; color: var(--y-gold); font-variant-numeric: tabular-nums; }
   .next { height: 150px; flex: none; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 30px; padding: 0 34px; }
-  .next .team { display: flex; align-items: center; gap: 20px; font-size: 40px; font-weight: 800; text-transform: uppercase; color: var(--y-gold); }
+  .next .team { min-width: 0; display: flex; align-items: center; gap: 20px; font-size: 40px; font-weight: 800; text-transform: uppercase; color: var(--y-gold); }
   .next .team.b { flex-direction: row-reverse; color: var(--y-pale); text-align: right; }
   .next .team span { flex: 1; min-width: 0; }
-  .next .team { min-width: 0; }
-  .hero { padding: 0 40px; }
   .next .mid { text-align: center; }
   .next .mid b { display: block; font-size: 46px; font-weight: 800; color: var(--white); }
 </style>

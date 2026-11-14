@@ -47,6 +47,18 @@ function readInput(el) {
 
 const run = (el) => ACTIONS[el.dataset.act]?.(el.dataset.arg, el);
 
+// Click feedback. A click usually redraws the panel, which replaces the very
+// button that was pressed, so the flash is put on the pressed button now and
+// again on its replacement after the redraw.
+const selectorFor = (el) => `button[data-act="${el.dataset.act}"][data-arg="${CSS.escape(el.dataset.arg || "")}"]`;
+let flashed = null;                  // { selector, until }
+function flash(el) {
+  if (!el) return;
+  el.classList.remove("hit");
+  void el.offsetWidth;               // restart the animation if it is already running
+  el.classList.add("hit");
+}
+
 document.addEventListener("change", (e) => {
   const el = e.target;
   if (el.dataset.act) return run(el);
@@ -57,7 +69,16 @@ document.addEventListener("click", (e) => {
   const tab = e.target.closest("button[data-tab]");
   if (tab) { tabId = tab.dataset.tab; location.hash = tabId; return render(); }
   const el = e.target.closest("button[data-act]");
-  if (el) run(el);
+  if (!el) return;
+  flashed = { selector: selectorFor(el), until: Date.now() + 450 };
+  flash(el);
+  run(el);
+});
+
+// Back / forward, or a link to another tab of the panel.
+addEventListener("hashchange", () => {
+  const id = location.hash.slice(1);
+  if (id && id !== tabId) { tabId = id; render(); }
 });
 
 // Enter in a text field saves it straight away.
@@ -82,30 +103,48 @@ function render() {
   const active = document.activeElement;
   const key = active?.dataset?.path;
   const keep = key && { value: active.value, start: active.selectionStart, end: active.selectionEnd };
-  const button = active?.tagName === "BUTTON" && active.dataset.act
-    ? `button[data-act="${active.dataset.act}"][data-arg="${CSS.escape(active.dataset.arg || "")}"]` : "";
+  const button = active?.tagName === "BUTTON" && active.dataset.act ? selectorFor(active) : "";
+  // Replacing the contents must not move the page: the scroll position is put
+  // back afterwards, and focus is returned without scrolling to it.
+  const scroll = { left: scrollX, top: scrollY };
 
   $("#tabs").innerHTML = TABS.map((t) =>
     `<button data-tab="${t.id}" class="${t.id === tabId ? "on" : ""}">${t.title}</button>`).join("");
-  $("#conn").textContent = store.online ? "Connected" : "No server: this browser only";
-  $("#conn").classList.toggle("off", !store.online);
+  const lost = store.online && store.status === "lost";
+  $("#conn").textContent = lost ? "Connection lost: changes are not reaching the screens"
+    : store.online ? "Connected" : "No server: this browser only";
+  $("#conn").classList.toggle("off", lost || !store.online);
 
   onair.hidden = !tab.top;
-  top.innerHTML = tab.top?.() || "";
-  app.innerHTML = tab.render();
+  put(top, tab.top?.() || "");
+  put(app, tab.render());
   showPreview(tab.preview?.());
 
   if (keep) {
     const el = document.querySelector(`[data-path="${CSS.escape(key)}"]`);
     if (el && el.type !== "checkbox") {
-      el.focus();
+      el.focus({ preventScroll: true });
       if (el.tagName !== "SELECT") {
         el.value = keep.value;
         try { el.setSelectionRange(keep.start, keep.end); } catch { /* number inputs */ }
       }
     }
   }
-  if (button) document.querySelector(button)?.focus();
+  if (button) document.querySelector(button)?.focus({ preventScroll: true });
+  scrollTo(scroll);
+  if (flashed && Date.now() < flashed.until) {
+    const el = document.querySelector(flashed.selector);
+    if (el && !el.classList.contains("hit")) flash(el);
+  }
+}
+
+// Replace an element's contents only if they changed. Every change is drawn
+// twice (once at the click, once when the server confirms it); the second
+// time nothing differs, so the buttons stay put and their flash is not cut off.
+function put(el, html) {
+  if (el.__html === html) return;
+  el.__html = html;
+  el.innerHTML = html;
 }
 
 // The preview is a real frame, so it is only reloaded when it has to show

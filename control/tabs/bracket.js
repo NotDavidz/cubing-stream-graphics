@@ -2,7 +2,7 @@
 // The format (single / double / Swiss) is chosen under Settings.
 
 import { store, getPath } from "../../shared/store.js";
-import { buildElimination, swissPair } from "../../shared/bracket.js";
+import { buildElimination, swissPair, hasThirdPlace } from "../../shared/bracket.js";
 import { esc } from "../../shared/ui.js";
 import { S, val, btn, box, row, hint, people, teams, matchMode, idByName } from "../kit.js";
 
@@ -19,7 +19,7 @@ function matchRow(id, a, b, base, won) {
       <input data-path="${base}.sb" value="${esc(val(`${base}.sb`))}" aria-label="Score, ${esc(b)}">
       <span class="nm">${esc(b)}</span>
       <span class="r">${btn("◀ Won", "winner", `${base}:a`, won === "a" ? "on" : "")}${btn("Won ▶", "winner", `${base}:b`, won === "b" ? "on" : "")}
-        ${known ? btn("Play", "loadMatch", ids.join(":"), "quiet", `title="Put these two on the scoreboard"`) : ""}</span>
+        ${known ? btn("Play", "loadMatch", [...ids, base].join(":"), "quiet", `title="Put these two on the scoreboard"`) : ""}</span>
     </div>`;
 }
 
@@ -36,18 +36,21 @@ export function resultsEditor() {
         m.b ? matchRow(`${r + 1}.${i + 1}`, m.a, m.b, `bracket.swissRounds.${r}.${i}`, m.winner)
             : `<div class="m"><span class="id">bye</span><span class="nm r2">${esc(m.a)}</span></div>`).join("")).reverse().join("")}`, "wide");
   }
-  const built = buildElimination(b.format, b.entrants || [], b.results || {});
+  const built = buildElimination(b.format, b.entrants || [], b.results || {}, { thirdPlace: hasThirdPlace(b) });
+  // Walkovers (byes) need no result, so they are not listed.
+  const list = (title, matches) => {
+    const playable = matches.filter((m) => !m.walkover);
+    if (!playable.length) return "";
+    return `<h3>${esc(title)}</h3>` + playable.map((m) =>
+      m.a.pending || m.b.pending
+        ? `<div class="m"><span class="id">${m.id}</span><span class="nm r2 hint">${esc(m.a.pending ? "waiting" : m.a.name)}</span>
+            <span></span><span></span><span class="nm hint">${esc(m.b.pending ? "waiting" : m.b.name)}</span></div>`
+        : matchRow(m.id, m.a.name, m.b.name, `bracket.results.${m.id}`, m.won)).join("");
+  };
   return box("Bracket results", built.sections.map((sec) =>
-    (sec.title ? `<h3 class="gold">${esc(sec.title)}</h3>` : "") + sec.rounds.map((round) => {
-      // Walkovers (byes) need no result, so they are not listed.
-      const playable = round.matches.filter((m) => !m.walkover);
-      if (!playable.length) return "";
-      return `<h3>${esc(round.title)}</h3>` + playable.map((m) =>
-        m.a.pending || m.b.pending
-          ? `<div class="m"><span class="id">${m.id}</span><span class="nm r2 hint">${esc(m.a.pending ? "waiting" : m.a.name)}</span>
-              <span></span><span></span><span class="nm hint">${esc(m.b.pending ? "waiting" : m.b.name)}</span></div>`
-          : matchRow(m.id, m.a.name, m.b.name, `bracket.results.${m.id}`, m.won)).join("");
-    }).join("")).join(""), "wide");
+    (sec.title ? `<h3 class="gold">${esc(sec.title)}</h3>` : "")
+    + sec.rounds.map((round) => list(round.title, round.matches)).join("")
+    + (sec.third ? list("Third place", [sec.third]) : "")).join(""), "wide");
 }
 
 export default {
@@ -83,13 +86,16 @@ export default {
       store.set("bracket.swissRounds", (S.bracket.swissRounds || []).slice(0, -1)),
 
     // Put a bracket match on the scoreboard, with the score back at 0 - 0.
+    // match.source remembers which bracket match it is, so the final score can
+    // be written back with one button (Live > Match score > Save to bracket).
     loadMatch(arg) {
-      const [a, b] = arg.split(":");
+      const [a, b, path] = arg.split(":");
       const solo = !S.teams?.[a];
       store.patch([
         { path: "match.mode", value: solo ? "solo" : "team" },
         { path: "match.a", value: a }, { path: "match.b", value: b },
         { path: "match.scoreA", value: 0 }, { path: "match.scoreB", value: 0 },
+        { path: "match.source", value: { path, a } }, { path: "match.solves", value: [] },
         ...(solo ? [{ path: "cameras.a.competitor", value: a }, { path: "cameras.b.competitor", value: b }] : []),
       ]);
     },

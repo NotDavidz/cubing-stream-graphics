@@ -100,6 +100,22 @@ export function entity(state, id) {
   return { kind: "none", id, name: "TBD", tag: "", photo: "", detail: "", members: [] };
 }
 
+// Which competitor or team a page shows right now (kind = "competitor" or
+// "team"). Normally the one the operator picked. With auto-scroll on, the
+// pages step through everyone in roster order, starting from that pick. The
+// step is worked out from the clock, so every screen changes together and
+// nothing has to be sent each time.
+//   state.program.cycle[kind] = { seconds: 8, since: <time it was switched on> }
+export function shownId(state, kind, now = Date.now()) {
+  const chosen = state.program?.[kind];
+  const ids = Object.keys((kind === "team" ? state.teams : state.competitors) || {});
+  const cycle = state.program?.cycle?.[kind];
+  const seconds = Number(cycle?.seconds) || 0;
+  if (!seconds || ids.length < 2) return chosen;
+  const steps = Math.max(0, Math.floor((now - (Number(cycle.since) || 0)) / (seconds * 1000)));
+  return ids[(Math.max(0, ids.indexOf(chosen)) + steps) % ids.length];
+}
+
 export function initials(name) {
   return String(name || "?").trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join("");
 }
@@ -134,29 +150,46 @@ export function banner(title, subtitle = "") {
     ${subtitle ? `<div class="subbar"><span data-fit="line">${esc(subtitle)}</span></div>` : ""}`;
 }
 
-// Footer bar: big gold text | white rule | two small white lines.
-export function infobar(big, line1, line2) {
+// Markup for falling confetti (styled in theme.css). The pieces are placed
+// from a fixed sequence, not Math.random, so every screen showing a frame
+// looks the same, and the markup is identical each time it is asked for.
+const COLOURS = ["#fae203", "#ecc13c", "#eae6a3", "#c8961e"];
+const CONFETTI = `<div class="confetti">${Array.from({ length: 46 }, (_, i) => {
+  const spread = (i * 0.618034) % 1, other = (i * 0.414214) % 1;
+  return `<i style="left:${(spread * 100).toFixed(1)}%;--s:${8 + Math.round(other * 12)}px;--c:${COLOURS[i % 4]};` +
+    `--t:${(4.5 + other * 4).toFixed(2)}s;--d:${(-spread * 8 + (i % 3)).toFixed(2)}s;--r:${i % 2 ? 320 : -280}deg"></i>`;
+}).join("")}</div>`;
+export const confetti = () => CONFETTI;
+
+// Footer bar: one line of big gold text over the pale strip.
+export function infobar(big, cls = "") {
   return `<div class="row">
-      <div class="big" data-fit="line">${esc(big)}</div>
-      <div class="rule"></div>
-      <div class="small"><b>${esc(line1)}</b>${esc(line2)}</div>
+      <div class="big ${cls}" data-fit="line">${esc(big)}</div>
     </div>
     <div class="strip"></div>`;
 }
 
-// "Best of 5", worked out from the match unless the operator typed their own
-// wording under Settings. A typed "Best of N" is treated as left over from
-// an earlier match, so it can never disagree with the score.
-export function formatLabel(state) {
-  const typed = String(state.event?.format || "").trim();
-  return typed && !/^best of \d+$/i.test(typed) ? typed : `Best of ${Math.max(1, Number(state.match?.bestOf) || 1)}`;
+// The default footer most solid frames use: the event name. With the footer
+// strip switched on (Settings > Footer strip) it takes turns with the extra
+// lines typed there. Which line is up is worked out from the clock, so every
+// screen changes together.
+//   state.settings.ticker = { on: true, seconds: 10, lines: ["...", "..."] }
+function footerLine(state) {
+  const title = state.event?.title || "";
+  const ticker = state.settings?.ticker;
+  const lines = ticker?.on ? [title, ...(ticker.lines || [])].filter(Boolean) : [];
+  if (lines.length < 2) return { text: title, cls: "" };
+  const step = Math.max(3, Number(ticker.seconds) || 10) * 1000;
+  return { text: lines[Math.floor(Date.now() / step) % lines.length], cls: "turn" };
 }
 
-// The default footer most solid frames use.
+let footerState = null, footerTimer = 0;
 export function eventInfobar(state) {
-  const e = state.event || {};
-  return infobar(e.title || "", [e.round, puzzleName(e.puzzle, true)].filter(Boolean).join(" · "),
-    [formatLabel(state), e.location].filter(Boolean).join(" · "));
+  footerState = state;
+  // A page that draws this footer keeps it turning by itself from then on.
+  footerTimer ||= params.has("still") ? 1 : setInterval(() => paint(".infobar", eventInfobar(footerState)), 500);
+  const { text, cls } = footerLine(state);
+  return infobar(text, cls);
 }
 
 export { puzzleIcon, puzzleName };

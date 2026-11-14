@@ -7,10 +7,10 @@
 
 import { store } from "../../shared/store.js";
 import { SCENES, sceneById } from "../../shared/scenes.js";
-import { matchInfo, victoryInfo } from "../../shared/match.js";
+import { matchInfo, victoryInfo, solveResult } from "../../shared/match.js";
 import { STATUSES } from "../../shared/camera.js";
 import { pickbanStatus, defaultSequence } from "../../shared/pickban.js";
-import { esc, puzzleIcon, puzzleName } from "../../shared/ui.js";
+import { esc, puzzleIcon, puzzleName, shownId } from "../../shared/ui.js";
 import {
   S, redraw, field, number, select, picker, btn, seg, box, row, hint,
   people, teams, nameOf, matchMode, sideOptions, puzzleOptions,
@@ -27,27 +27,62 @@ const current = () => (SCENES.some((s) => s.id === editing) ? editing : onAir())
 
 // ---------- Boxes ----------
 
+// The score seen at the last draw and when it last changed, so a number can
+// pop when it changes. The mark stays for the length of the animation, which
+// keeps the markup the same across the redraws that follow a click.
+const lastScore = {}, changedAt = {};
+
+// The two "who is playing" selects.
+function sidePickers() {
+  const kind = matchMode() === "solo" ? "player" : "team";
+  return ["a", "b"].map((side) =>
+    picker(`Side ${side.toUpperCase()} (${kind})`, "side", side, sideOptions(), S.match?.[side])).join("");
+}
+
 function scoreBox() {
   const m = matchInfo(S);
-  const half = (side, key, score) => `<div>
-      <div class="who">${esc(m[side].name)}</div><div class="n">${score}</div>
+  const half = (side, key, score) => {
+    if (lastScore[key] !== undefined && lastScore[key] !== score) changedAt[key] = Date.now();
+    lastScore[key] = score;
+    const changed = Date.now() - (changedAt[key] || 0) < 400;
+    return `<div>
+      <div class="who">${esc(m[side].name)}</div><div class="n ${changed ? "changed" : ""}">${score}</div>
       <div class="r centre">${btn("−", "score", `${key}:-1`, "big")}${btn("+", "score", `${key}:1`, "big primary")}</div></div>`;
-  const kind = matchMode() === "solo" ? "player" : "team";
+  };
   return box("Match score", `
     <div class="score">
       ${half("a", "scoreA", m.scoreA)}
       <div class="mid"><span class="hint">Best of ${m.bestOf}<br>first to ${m.needed}</span>${btn("Swap sides", "swapSides")}${btn("Reset to 0 - 0", "resetScore")}</div>
       ${half("b", "scoreB", m.scoreB)}
     </div>
-    ${m.winner ? `<div class="note"><span><b>${esc(m[m.winner].name)}</b> has won the match.</span>${btn("Show victory screen", "showVictory", "", "primary")}</div>` : ""}
-    ${row(picker(`Side A (${kind})`, "side", "a", sideOptions(), S.match?.a), picker(`Side B (${kind})`, "side", "b", sideOptions(), S.match?.b),
-      number("Best of", "match.bestOf", `min="1" step="2" style="width:90px"`))}`);
+    ${row(sidePickers(), number("Best of", "match.bestOf", `min="1" step="2" style="width:90px"`))}
+    ${m.winner ? `<div class="note"><span><b>${esc(m[m.winner].name)}</b> has won the match${m.cheer ? " and is highlighted on the Versus page and the score bar." : "."}</span>
+      <span class="r">${S.match?.source ? btn("Save to bracket", "recordResult", "", "primary", `title="Write this score into the bracket match it was loaded from"`) : ""}
+        ${btn("Show as event champion", "showVictory")}</span></div>` : ""}`);
 }
 
-function matchupBox(title) {
-  const kind = matchMode() === "solo" ? "player" : "team";
-  return box(title, row(picker(`Side A (${kind})`, "side", "a", sideOptions(), S.match?.a),
-    picker(`Side B (${kind})`, "side", "b", sideOptions(), S.match?.b)));
+const matchupBox = (title) => box(title, row(sidePickers()));
+
+// What the two cameras show right now, read as one solve.
+function currentSolve() {
+  const [a, b] = ["a", "b"].map((slot) => solveResult(S.cameras?.[slot]?.time, S.cameras?.[slot]?.status));
+  const ready = !isNaN(a.value) && !isNaN(b.value);
+  return { a: a.text, b: b.text, ready, winner: !ready || a.value === b.value ? "" : a.value < b.value ? "a" : "b" };
+}
+
+// Solve history: one press takes the two times on the cameras, works out who
+// was faster, gives them the point and adds the solve to the list.
+function solvesBox() {
+  const m = matchInfo(S), now = currentSolve(), solves = S.match?.solves || [];
+  const who = (side) => (side ? esc(m[side].name) : "nobody (tie)");
+  return box(`Solves · ${solves.length} recorded`, `
+    <p>${now.ready ? `On the cameras: <b>${esc(now.a)}</b> v <b>${esc(now.b)}</b>, point to <b>${who(now.winner)}</b>.`
+      : "Type both times on the cameras (or press DNF), then record the solve."}</p>
+    ${row(btn("Record solve", "recordSolve", "", "primary", now.ready ? "" : "disabled"),
+      btn("Clear times", "clearTimes"), btn("Undo last solve", "undoSolve", "", "", solves.length ? "" : "disabled"))}
+    ${solves.map((s, i) => `<div class="m"><span class="id">${i + 1}</span><span class="nm r2">${esc(s.a)}</span>
+      <span></span><span></span><span class="nm">${esc(s.b)}</span><span class="hint">${who(s.winner)}</span></div>`).reverse().join("")}
+    ${hint("Camera A is side A. +2 adds two seconds; DNF and DNS lose to any time. The + and − buttons still change the score without touching this list.")}`);
 }
 
 // Who is in front of a camera. In a team match the two teams' members are
@@ -78,6 +113,13 @@ function cameraBox(slot, title = `Camera ${slot.toUpperCase()}`) {
       btn(st.button, "status", `${slot}:${id}`, `big ${id === status && id !== "none" ? (st.tone === "alert" ? "alert" : "on") : ""}`)))}`);
 }
 
+// How long a +2 / DNF / win stays up. This control panel does the clearing,
+// so it has to stay open.
+function alertsBox() {
+  return box("Alerts", seg("+2 / DNF / win disappear", "settings.autoClear",
+    [[0, "When I press Clear"], [5, "After 5 s"], [10, "After 10 s"], [20, "After 20 s"]], 0));
+}
+
 function soloCameraBox() {
   const slot = S.program?.camSlot === "b" ? "b" : "a";
   return box("Which camera", `
@@ -88,7 +130,9 @@ function soloCameraBox() {
 
 function bugBox() {
   return box("Score bug", seg("Position", "program.bugPos", [["top", "Top"], ["bottom", "Bottom"]], "top")
-    + seg("Score", "match.show", [[true, "Shown"], [false, "Hidden"]], true));
+    + (matchMode() === "team" ? seg("Solver names under the bar", "program.bugSolvers", [[true, "Shown"], [false, "Hidden"]], true) : "")
+    + seg("Solve history under the bar", "program.bugHistory", [[true, "Shown"], [false, "Hidden"]], true)
+    + hint("A time, +2 or DNF set on a camera below hangs under that side of the bar: camera A on the left, camera B on the right."));
 }
 
 function pickbanBox() {
@@ -106,18 +150,29 @@ function pickbanBox() {
     ${hint("The puzzle pool and the turn order are under Settings.")}`, "wide");
 }
 
+// Auto-scroll: the page steps through everyone by itself, starting from the
+// one that is showing. Clicking a name jumps there and carries on from it.
+const cycleSeconds = (kind) => Number(S.program?.cycle?.[kind]?.seconds) || 0;
+const cycleSwitch = (kind) => `<div class="switch"><span>Auto-scroll through everyone</span><div class="seg">${
+  [[0, "Off"], [5, "5 s"], [8, "8 s"], [12, "12 s"], [20, "20 s"]].map(([v, t]) =>
+    btn(t, "cycle", `${kind}:${v}`, v === cycleSeconds(kind) ? "on" : "")).join("")}</div></div>`;
+
 function personBox() {
   const teamOf = (id) => teams().find(([, t]) => (t.members || []).includes(id))?.[1].name || "";
+  const showing = shownId(S, "competitor");
   return box("Who is on the competitor page", `
+    ${cycleSwitch("competitor")}
     <div class="pool">${people().map(([id, p]) =>
-      btn(`<b>${esc(p.name)}</b><small>${esc(teamOf(id) || p.wcaId || "")}</small>`, "pickCompetitor", id, `card ${S.program?.competitor === id ? "on" : ""}`)).join("")}</div>
+      btn(`<b>${esc(p.name)}</b><small>${esc(teamOf(id) || p.wcaId || "")}</small>`, "pickCompetitor", id, `card ${showing === id ? "on" : ""}`)).join("")}</div>
     ${hint("Names, photos and personal bests are edited under People & teams.")}`, "wide");
 }
 
 function teamBox() {
+  const showing = shownId(S, "team");
   return box("Which team is on the team page", `
+    ${cycleSwitch("team")}
     <div class="pool">${teams().map(([id, t]) =>
-      btn(`<b>${esc(t.name)}</b><small>${(t.members || []).length} members</small>`, "pickTeam", id, `card ${S.program?.team === id ? "on" : ""}`)).join("")}</div>
+      btn(`<b>${esc(t.name)}</b><small>${(t.members || []).length} members</small>`, "pickTeam", id, `card ${showing === id ? "on" : ""}`)).join("")}</div>
     ${hint("Team names, logos and members are edited under People & teams.")}`, "wide");
 }
 
@@ -133,18 +188,20 @@ function intermissionBox() {
 function victoryBox() {
   const pick = S.victory?.winner || "auto";
   const { winner } = victoryInfo(S);
-  const title = S.victory?.title || "Winner";
+  const title = S.victory?.title || "";
   const everyone = [...teams(), ...people()].map(([id, x]) => [id, x.name]);
-  return box(`Victory screen · ${esc(winner ? winner.name : "nobody yet")}`, `
-    <div class="switch"><span>Winner</span><div class="seg">
+  return box(`Event champion · ${esc(winner ? winner.name : "nobody yet")}`, `
+    ${hint("For the winner of the whole event. A match win is shown on the Versus page by itself.")}
+    <div class="switch"><span>Champion</span><div class="seg">
       ${btn("Match winner", "set", `victory.winner="auto"`, pick === "auto" ? "on" : "")}
       ${btn(esc(nameOf(S.match?.a)), "set", `victory.winner="a"`, pick === "a" ? "on" : "")}
       ${btn(esc(nameOf(S.match?.b)), "set", `victory.winner="b"`, pick === "b" ? "on" : "")}</div></div>
     ${row(`<label>Or anyone else (shown without a score)<select data-path="victory.winner">
         <option value="" disabled ${["auto", "a", "b"].includes(pick) ? "selected" : ""}>— choose —</option>${
         everyone.map(([id, name]) => `<option value="${esc(id)}" ${id === pick ? "selected" : ""}>${esc(name)}</option>`).join("")}</select></label>`)}
-    ${row(...["Winner", "Match Winner", "Champions"].map((t) => btn(t, "set", `victory.title=${JSON.stringify(t)}`, title === t ? "on" : "")))}
-    ${row(field("Banner title", "victory.title", `placeholder="Winner"`), field("Line under the name", "victory.note", `placeholder="e.g. Fall 2026 champions"`))}`);
+    ${row(...[["", "Automatic"], ["Champions", "Champions"], ["Champion", "Champion"], ["Winner", "Winner"]].map(([v, t]) =>
+      btn(t, "set", `victory.title=${JSON.stringify(v)}`, title === v ? "on" : "")))}
+    ${row(field("Banner title", "victory.title", `placeholder="Automatic: Champion / Champions"`), field("Line under the name", "victory.note", `placeholder="e.g. Undefeated all season"`))}`);
 }
 
 function roundBox() {
@@ -163,14 +220,30 @@ const PANELS = {
   competitor: () => personBox(),
   team: () => teamBox(),
   victory: () => victoryBox() + scoreBox(),
-  "cam-versus": () => scoreBox() + cameraBox("a") + cameraBox("b"),
-  "cam-solo": () => soloCameraBox() + scoreBox(),
-  scorebug: () => bugBox() + scoreBox(),
+  "cam-versus": () => scoreBox() + cameraBox("a") + cameraBox("b") + solvesBox() + alertsBox(),
+  "cam-solo": () => soloCameraBox() + alertsBox() + scoreBox(),
+  scorebug: () => scoreBox() + cameraBox("a", "Left side · camera A") + cameraBox("b", "Right side · camera B") + solvesBox() + bugBox() + alertsBox(),
 };
 
 // ---------- The tab ----------
 
 const clearTimers = {};
+
+// Show this entry; with auto-scroll on, carry on from it.
+function pick(kind, id) {
+  const ops = [{ path: `program.${kind}`, value: id }];
+  if (cycleSeconds(kind)) ops.push({ path: `program.cycle.${kind}.since`, value: Date.now() });
+  store.patch(ops);
+}
+
+// While auto-scroll runs, redraw when it moves on so the lit name keeps up.
+let lastShown = "";
+setInterval(() => {
+  if (!S || !(cycleSeconds("competitor") || cycleSeconds("team"))) return;
+  if (!document.querySelector("button[data-act=cycle]")) return;     // the names are not on screen
+  const shown = `${shownId(S, "competitor")} ${shownId(S, "team")}`;
+  if (shown !== lastShown) { lastShown = shown; redraw(); }
+}, 500);
 
 export default {
   id: "live",
@@ -213,18 +286,40 @@ export default {
       const [key, delta] = arg.split(":");
       store.set(`match.${key}`, Math.max(0, (Number(S.match?.[key]) || 0) + Number(delta)));
     },
-    resetScore: () => store.patch([{ path: "match.scoreA", value: 0 }, { path: "match.scoreB", value: 0 }]),
+    resetScore: () => store.patch([{ path: "match.scoreA", value: 0 }, { path: "match.scoreB", value: 0 }, { path: "match.solves", value: [] }]),
+
+    recordSolve() {
+      const now = currentSolve();
+      if (!now.ready) return;
+      const ops = [{ path: "match.solves", value: [...(S.match?.solves || []), { a: now.a, b: now.b, winner: now.winner }] }];
+      const key = now.winner && `score${now.winner.toUpperCase()}`;
+      if (key) ops.push({ path: `match.${key}`, value: (Number(S.match?.[key]) || 0) + 1 });
+      store.patch(ops);
+    },
+    // Takes the last solve off the list, and its point back.
+    undoSolve() {
+      const solves = S.match?.solves || [], last = solves[solves.length - 1];
+      if (!last) return;
+      const ops = [{ path: "match.solves", value: solves.slice(0, -1) }];
+      const key = last.winner && `score${last.winner.toUpperCase()}`;
+      if (key) ops.push({ path: `match.${key}`, value: Math.max(0, (Number(S.match?.[key]) || 0) - 1) });
+      store.patch(ops);
+    },
+    clearTimes: () => store.patch(["a", "b"].flatMap((slot) =>
+      [{ path: `cameras.${slot}.time`, value: "" }, { path: `cameras.${slot}.status`, value: "none" }])),
     swapSides() {
       // The cameras are left alone: they are pointed at people, not at sides.
       const m = S.match || {};
       store.patch([
         { path: "match.a", value: m.b }, { path: "match.b", value: m.a },
         { path: "match.scoreA", value: m.scoreB || 0 }, { path: "match.scoreB", value: m.scoreA || 0 },
+        { path: "match.solves", value: (m.solves || []).map((s) => ({ a: s.b, b: s.a, winner: s.winner && (s.winner === "a" ? "b" : "a") })) },
       ]);
     },
     // In a player v player match the cameras follow the two players.
     side(side, el) {
-      const ops = [{ path: `match.${side}`, value: el.value }];
+      // A different side means this is no longer the bracket match that was loaded.
+      const ops = [{ path: `match.${side}`, value: el.value }, { path: "match.source", value: null }, { path: "match.solves", value: [] }];
       if (matchMode() === "solo") ops.push({ path: `cameras.${side}.competitor`, value: el.value });
       store.patch(ops);
     },
@@ -260,7 +355,29 @@ export default {
       { path: "pickban.sequence", value: defaultSequence((S.pickban?.pool || []).length, first) },
       { path: "pickban.actions", value: [] }]),
 
-    pickCompetitor: (id) => store.set("program.competitor", id),
-    pickTeam: (id) => store.set("program.team", id),
+    pickCompetitor: (id) => pick("competitor", id),
+    pickTeam: (id) => pick("team", id),
+    // arg "competitor:8" = step every 8 seconds; 0 switches it off. Either way
+    // the entry showing right now becomes the picked one, so nothing jumps.
+    cycle(arg) {
+      const [kind, seconds] = arg.split(":");
+      store.patch([
+        { path: `program.${kind}`, value: shownId(S, kind) },
+        { path: `program.cycle.${kind}`, value: { seconds: Number(seconds), since: Date.now() } },
+      ]);
+    },
+
+    // Write the score into the bracket match it was loaded from (the Play
+    // button on the Bracket tab). Sides may have been swapped since.
+    recordResult() {
+      const m = matchInfo(S), source = S.match?.source;
+      if (!source?.path || !m.winner) return;
+      const straight = S.match.a === source.a;
+      store.patch([
+        { path: `${source.path}.sa`, value: straight ? m.scoreA : m.scoreB },
+        { path: `${source.path}.sb`, value: straight ? m.scoreB : m.scoreA },
+        { path: `${source.path}.winner`, value: (m.winner === "a") === straight ? "a" : "b" },
+      ]);
+    },
   },
 };

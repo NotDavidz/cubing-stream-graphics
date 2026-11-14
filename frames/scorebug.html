@@ -6,29 +6,102 @@
 <link rel="stylesheet" href="../shared/theme.css">
 <link rel="stylesheet" href="../shared/camera.css">
 <style>
-  /* Centred with left, not a transform: the entry animation owns transform. */
-  .bug { position: absolute; left: 370px; top: 28px; width: 1180px; }
-  .bug.bottom { top: auto; bottom: 28px; }
-  .bug .strip { height: 10px; background: var(--y-pale); margin-bottom: 8px; }
+  /* Centred with left, not a transform: the entry animation owns transform.
+     At the bottom of the screen the whole stack is turned upside down, so the
+     plates hang above the bar instead of under it. */
+  .bug { position: absolute; left: 370px; top: 28px; width: 1180px; display: flex; flex-direction: column; gap: 8px; }
+  .bug.bottom { top: auto; bottom: 28px; flex-direction: column-reverse; }
+  .bug .strip { height: 10px; background: var(--y-pale); }
   .bug .scorebar { height: 76px; }
   .bug .scorebar .team { font-size: 32px; }
   .bug .scorebar .num { height: 60px; width: 72px; font-size: 46px; }
+
+  /* Under the bar: a plate per side (solver, time, +2 / DNF) and a tag in
+     the middle (match point, decider). */
+  .under { position: relative; z-index: 1; height: 48px; display: flex; justify-content: space-between; }
+  .solver { display: flex; height: 48px; max-width: 430px; font-weight: 800; text-transform: uppercase; white-space: nowrap; }
+  .solver.b { flex-direction: row-reverse; }
+  .solver > * { flex: none; display: flex; align-items: center; padding: 0 16px; }
+  .solver .nm { flex: 0 1 auto; min-width: 0; display: block; line-height: 48px; overflow: hidden; text-overflow: ellipsis;
+                background: var(--ink); color: var(--y-gold); font-size: 24px; }
+  .solver.b .nm { color: var(--y-pale); }
+  .solver .time { background: var(--y-gold); color: var(--ink); font-size: 30px; font-variant-numeric: tabular-nums; }
+  .solver.b .time { background: var(--y-pale); }
+  .solver .st { background: var(--y-bright); color: var(--ink); font-size: 30px; }
+  /* Penalties are red and glow, as they do around a camera window. */
+  .solver.alert { animation: alarm 1s ease-in-out infinite; }
+  .solver.alert .st { background: var(--alert); color: var(--white); }
+
+  #tag { position: absolute; left: 50%; top: 0; translate: -50% 0; }
+  .bug.bottom #tag { top: auto; bottom: 0; }
+  #tag .tag { display: block; font-size: 22px; line-height: 36px; padding: 0 18px; white-space: nowrap; }
+  #tag .tag.b { background: var(--y-pale); }
+
+  /* Solve history: the last few solves, oldest first. In each pair the left
+     time is side A's; the faster one is lit. It grows from the left edge so
+     the solves already there do not move when one is added. */
+  #history { display: flex; gap: 8px; font-weight: 800; white-space: nowrap; }
+  #history .h { display: flex; align-items: center; height: 36px; background: var(--ink); font-size: 20px; font-variant-numeric: tabular-nums; }
+  #history .h small { padding: 0 8px; color: var(--muted); font-size: 14px; }
+  #history .h b { padding: 0 10px; line-height: 36px; color: var(--white); }
+  #history .h b.won { background: var(--y-gold); color: var(--ink); }
+  #history .h b.b.won { background: var(--y-pale); }
 </style>
 </head>
 <body>
-<!-- Fully transparent overlay: just the score bar, to lay over any footage.
-     ?pos=bottom moves it to the bottom of the picture. -->
+<!-- Fully transparent overlay: the score bar, to lay over any footage, with
+     the solvers, their times and penalties hanging off it.
+     Top or bottom is chosen in the control panel (Live > Score bug).
+     ?pos=top or ?pos=bottom pins it instead. -->
 <div class="stage hollow">
-  <div class="bug rise" id="bug"><div class="strip"></div><div class="scorebar" id="scorebar"></div></div>
+  <div class="bug rise" id="bug">
+    <div class="strip"></div>
+    <div class="scorebar" id="scorebar"></div>
+    <div class="under"><div id="solver-a"></div><div id="tag"></div><div id="solver-b"></div></div>
+    <div id="history"></div>
+  </div>
 </div>
 <script type="module">
 import { store } from "../shared/store.js";
-import { initStage, params, paint } from "../shared/ui.js";
-import { scoreBar } from "../shared/camera.js";
+import { matchInfo } from "../shared/match.js";
+import { initStage, params, paint, esc, shortName } from "../shared/ui.js";
+import { scoreBar, camInfo } from "../shared/camera.js";
 
 initStage();
-if (params.get("pos") === "bottom") document.querySelector("#bug").classList.add("bottom");
-store.subscribe((state) => paint("#scorebar", scoreBar(state)));
+const HISTORY = 6;       // how many solves fit under the bar
+
+// Camera A belongs to the left side of the bar, camera B to the right.
+// In a team match the plate names the solver; in a player match the bar
+// already does, so the plate holds only the time and the status.
+function plate(state, slot, named) {
+  const { cam, who, status } = camInfo(state, slot);
+  const parts = [
+    named && who.kind !== "none" ? `<span class="nm">${esc(who.name)}</span>` : "",
+    cam.time ? `<span class="time" data-k="time" data-v="${esc(cam.time)}">${esc(cam.time)}</span>` : "",
+    status.label ? `<span class="st" data-k="st" data-v="${esc(status.label)}">${esc(status.label)}</span>` : "",
+  ].join("");
+  return parts ? `<div class="solver ${slot} ${status.tone || ""}">${parts}</div>` : "";
+}
+
+function tag(m) {
+  if (m.point === "both") return `<span class="tag pop">Decider</span>`;
+  if (m.point) return `<span class="tag ${m.point} pop">Match point · ${esc(shortName(m[m.point]))}</span>`;
+  return "";
+}
+
+store.subscribe((state) => {
+  const pos = params.get("pos") || state.program?.bugPos;
+  const m = matchInfo(state);
+  const named = m.a.kind === "team" && state.program?.bugSolvers !== false;
+  document.querySelector("#bug").classList.toggle("bottom", pos === "bottom");
+  paint("#scorebar", scoreBar(state));
+  paint("#solver-a", plate(state, "a", named));
+  paint("#solver-b", plate(state, "b", named));
+  paint("#tag", m.showScore ? tag(m) : "");
+  const solves = state.program?.bugHistory === false ? [] : state.match?.solves || [];
+  paint("#history", solves.map((s, i) => `<span class="h"><small>${i + 1}</small>${["a", "b"].map((side) =>
+    `<b class="${side} ${s.winner === side ? "won" : ""}">${esc(s[side] || "–")}</b>`).join("")}</span>`).slice(-HISTORY).join(""));
+});
 </script>
 </body>
 </html>

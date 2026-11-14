@@ -21,16 +21,18 @@
 <h2>Switched by the operator</h2>
 <a href="program.html">Program <span>one source that shows whichever page is chosen in the control panel</span></a>
 <h2>Solid (shown on their own)</h2>
-<a href="versus.html">Versus <span>two sides and the match score</span></a>
-<a href="pickban.html">Pick &amp; ban</a>
-<a href="bracket.html">Bracket <span>single elimination, double elimination or Swiss</span></a>
-<a href="competitor.html">Competitor overview</a>
-<a href="team.html">Team overview</a>
-<a href="intermission.html">Intermission <span>starting soon, be right back, countdown</span></a>
+<div id="solid"></div>
 <h2>Hollow (go over camera footage)</h2>
-<a href="cam-versus.html">Cameras: head to head <span>two camera windows, score bar</span></a>
-<a href="cam-solo.html?slot=a">Camera A frame <span>thin frame with event bulge</span></a>
-<a href="cam-solo.html?slot=b">Camera B frame</a>
-<a href="scorebug.html">Score bug <span>score bar only</span></a>
+<div id="hollow"></div>
+<script type="module">
+// The list is built from shared/scenes.js, so a new frame shows up by itself.
+import { SCENES } from "../shared/scenes.js";
+
+const link = (href, name, note = "") => `<a href="${href}">${name}${note ? ` <span>${note}</span>` : ""}</a>`;
+for (const kind of ["solid", "hollow"]) {
+  document.querySelector(`#${kind}`).innerHTML = SCENES.filter((s) => s.kind === kind).map((s) =>
+    link(`${s.id}.html`, s.name, s.note) + (s.variants || []).map(([query, name]) => link(`${s.id}.html${query}`, name)).join("")).join("");
+}
+</script>
 </body>
 </html>

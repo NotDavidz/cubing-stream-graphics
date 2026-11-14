@@ -11,10 +11,8 @@
   .turn .team { display: flex; align-items: center; gap: 18px; font-size: 34px; font-weight: 800; text-transform: uppercase; color: var(--y-gold); opacity: .45; transition: opacity .3s; }
   .turn .team.b { flex-direction: row-reverse; color: var(--y-pale); text-align: right; }
   .turn .team span { flex: 1; }
-  .turn .now { min-width: 0; max-width: 760px; }
-  .card h3, .card .slot { max-width: 100%; padding: 0 12px; }
   .turn .team.active { opacity: 1; }
-  .turn .now { text-align: center; }
+  .turn .now { min-width: 0; max-width: 760px; text-align: center; }
   .turn .now b { display: block; font-size: 44px; font-weight: 800; line-height: 1.05; text-transform: uppercase; }
   .turn .now b.ban { color: var(--alert); }
   .turn .now b.pick { color: var(--y-bright); }
@@ -24,6 +22,7 @@
           transition: opacity .35s ease; }
   .card .puzzle { width: 150px !important; height: 150px !important; transition: color .35s; }
   .card h3 { font-size: 32px; font-weight: 800; text-transform: uppercase; color: var(--y-gold); text-align: center; line-height: 1.05; transition: color .35s; }
+  .card h3, .card .slot { max-width: 100%; padding: 0 12px; }
   .card .slot { height: 34px; }
 
   .card.banned { opacity: .55; }
@@ -72,7 +71,7 @@ function drawCards(status, sides) {
     paint(el.querySelector(".slot"), {
       banned: `<span class="tag alert pop" data-fit="line">Banned · ${who}</span>`,
       picked: `<span class="tag ${c.side === "b" ? "pale" : ""} pop" data-fit="line">Pick · ${who}</span>`,
-      decider: `<span class="tag pop" data-fit="line" style="background:var(--y-bright)">Decider</span>`,
+      decider: `<span class="tag bright pop" data-fit="line">Decider</span>`,
       open: "",
     }[c.status]);
   }

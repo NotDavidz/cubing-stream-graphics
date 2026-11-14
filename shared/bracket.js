@@ -5,6 +5,11 @@
 // match id. Everything else, including who advances, is worked out here.
 //
 //   state.bracket.results["W1-1"] = { sa: 3, sb: 1, winner: "a" }
+//
+// Byes: when the entrant count is not a power of two, the top seeds have no
+// first-round opponent. Their first-round "match" is a walkover: it is marked
+// walkover: true so nothing draws it, and the seed simply appears in the next
+// round, waiting for an opponent.
 
 const BYE = { bye: true, name: "BYE" };
 
@@ -26,10 +31,23 @@ function roundTitle(matchesInRound, prefix = "") {
   return `Round of ${matchesInRound * 2}`;
 }
 
-// format: "single" or "double". Returns
-//   { sections: [{ title, rounds: [{ title, matches: [match] }] }] }
-// where match = { id, a, b, sa, sb, winner } and a/b = { name, bye?, pending? }.
-export function buildElimination(format, entrants, results = {}) {
+// The match for third place between the two losing semifinalists. Single
+// elimination only, and only once there are four entrants to have semifinals.
+export const THIRD = "3RD";
+export function hasThirdPlace(bracket = {}) {
+  return bracket.format !== "double" && bracket.format !== "swiss"
+    && bracket.thirdPlace !== false && (bracket.entrants || []).length >= 4;
+}
+
+// format: "single" or "double". options.thirdPlace adds the third place match
+// to a single elimination bracket. Returns
+//   { sections: [{ title, rounds: [{ title, matches: [match] }], third? }] }
+// where match = { id, a, b, sa, sb, won, winner, loser, walkover, feeders }
+// and a/b = { name, seed?, bye?, pending? }.
+//   won       "a" | "b" | ""
+//   walkover  one side is a bye, so there is nothing to play or draw
+//   feeders   [id | null, id | null]: the match whose winner fills slot a / b
+export function buildElimination(format, entrants, results = {}, options = {}) {
   const count = Math.max(entrants.length, format === "double" ? 4 : 2);
   const size = 2 ** Math.ceil(Math.log2(count));
   const wbRounds = Math.log2(size);
@@ -92,7 +110,11 @@ export function buildElimination(format, entrants, results = {}) {
       winner = won === "a" ? a : b;
       loser = won === "a" ? b : a;
     }
-    return (cache[id] = { id, a, b, sa: res.sa ?? "", sb: res.sb ?? "", won, winner, loser });
+    return (cache[id] = {
+      id, a, b, sa: res.sa ?? "", sb: res.sb ?? "", won, winner, loser,
+      walkover: Boolean(a.bye || b.bye),
+      feeders: defs[id].map((def) => (def.take === "winner" ? def.from : null)),
+    });
   }
 
   const toRounds = (list, title) => list.map((ids, i) => ({
@@ -100,7 +122,15 @@ export function buildElimination(format, entrants, results = {}) {
     matches: ids.map(solve),
   }));
 
-  if (format !== "double") return { sections: [{ title: "", rounds: toRounds(wb) }] };
+  if (format !== "double") {
+    const section = { title: "", rounds: toRounds(wb) };
+    if (options.thirdPlace && wbRounds >= 2) {
+      const semis = wb[wbRounds - 2];
+      defs[THIRD] = semis.map((id) => ({ from: id, take: "loser" }));
+      section.third = solve(THIRD);
+    }
+    return { sections: [section] };
+  }
   const winners = toRounds(wb, "Winners R");
   winners.push({ title: "Grand Final", matches: [solve("GF")] });
   return {

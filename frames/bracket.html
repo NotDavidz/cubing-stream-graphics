@@ -7,21 +7,25 @@
 <style>
   main { display: flex; flex-direction: column; gap: 14px; --rowh: 44px; }
 
-  /* ----- Elimination ----- */
-  .section { position: relative; display: flex; flex-direction: column; min-height: 0; }
-  .section > .label { color: var(--y-gold); margin-bottom: 4px; }
-  .rounds { flex: 1; display: flex; gap: 56px; min-height: 0; }
+  /* ----- Elimination -----
+     Matches are placed by the script (see layout()), one "unit" of height per
+     match in the busiest round, so a round with byes takes no extra room. */
+  main { justify-content: center; }
+  .section { position: relative; flex: none; }
+  .section > .label { color: var(--y-gold); height: 26px; }
+  .rounds { display: flex; gap: var(--gap, 56px); }
   .round { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-  .round > .label { height: 30px; font-size: 16px; text-align: center; }
-  .round .list { flex: 1; display: flex; flex-direction: column; justify-content: space-around; }
+  .round > .label { height: 30px; font-size: 16px; text-align: center; flex: none; white-space: nowrap; }
+  .round .list { flex: 1; position: relative; }
   svg.lines { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }
   svg.lines path { fill: none; stroke: #5c5c5c; stroke-width: 3; }
 
-  .match { display: flex; flex-direction: column; gap: 3px; position: relative; z-index: 1; }
+  .match { display: flex; flex-direction: column; gap: 3px; z-index: 1; }
+  .round .list .match { position: absolute; left: 0; right: 0; }
   .slot { height: var(--rowh); display: flex; align-items: center; background: var(--panel);
           font-size: calc(var(--rowh) * .52); font-weight: 600; }
   .slot .seed { width: var(--rowh); text-align: center; color: var(--muted); font-size: .75em; font-weight: 700; flex: none; }
-  .slot .nm { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-transform: uppercase; }
+  .slot .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; text-transform: uppercase; padding-right: 6px; }
   .slot b { width: calc(var(--rowh) * 1.15); height: 100%; display: flex; align-items: center; justify-content: center;
             background: var(--panel-2); font-weight: 800; flex: none; }
   .slot.win .nm { color: var(--y-gold); font-weight: 800; }
@@ -29,9 +33,15 @@
   .slot.lose { opacity: .5; }
   .slot.empty .nm { color: #666; }
 
-  .champion { flex: .8; display: flex; flex-direction: column; justify-content: center; align-items: stretch; text-align: center; }
+  /* Third place sits under the final, in the same column. */
+  .third { position: absolute; left: 0; right: 0; }
+  .third .label { display: block; font-size: 14px; height: 22px; text-align: center; }
+  .third .match { position: static !important; }
+
+  .champion { flex: .8; }
+  .champion .list { display: flex; flex-direction: column; justify-content: center; text-align: center; }
   .champion .box { background: var(--y-gold); color: var(--ink); padding: 14px 10px; font-size: 30px; font-weight: 800; text-transform: uppercase; line-height: 1.1; }
-  .champion .label { margin-bottom: 8px; color: var(--y-gold); }
+  .champion .label { color: var(--y-gold); }
 
   /* ----- Swiss ----- */
   .swiss { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 22px; min-height: 0; }
@@ -57,7 +67,7 @@
 </div>
 <script type="module">
 import { store } from "../shared/store.js";
-import { buildElimination, swissStandings } from "../shared/bracket.js";
+import { buildElimination, swissStandings, hasThirdPlace } from "../shared/bracket.js";
 import { initStage, paint, esc, banner, eventInfobar } from "../shared/ui.js";
 
 initStage();
@@ -67,30 +77,82 @@ function slot(s, score, result) {
   const cls = s.bye || s.pending ? "empty" : result;
   return `<div class="slot ${cls}">
     <span class="seed">${s.seed || ""}</span>
-    <span class="nm">${s.pending ? "—" : esc(s.name)}</span>
+    <span class="nm" data-fit="line">${s.pending ? "—" : esc(s.name)}</span>
     <b>${esc(score)}</b></div>`;
 }
 
-function matchBox(m) {
+function matchBox(m, attrs = "") {
   const res = (side) => (m.won ? (m.won === side ? "win" : "lose") : "");
-  return `<div class="match">${slot(m.a, m.sa, res("a"))}${slot(m.b, m.sb, res("b"))}</div>`;
+  return `<div class="match" ${attrs}>${slot(m.a, m.sa, res("a"))}${slot(m.b, m.sb, res("b"))}</div>`;
 }
 
-function section(sec, champion) {
-  const rounds = sec.rounds.map((r) => `<div class="round">
+// ---------- Elimination layout ----------
+//
+// Each match is given a height in "units" and a centre line, working back
+// from the final: a match is as tall as the matches that feed it, and sits
+// in the middle of them. A walkover (bye) takes no room at all, which is how
+// a seed with a bye ends up drawn straight into the next round.
+
+const GAP = 3;                 // px between the two rows of a match (see .match)
+let matches = new Map();       // id -> match, for the connector lines
+let rowh = 44;
+
+function layout(sec) {
+  const all = sec.rounds.flatMap((r) => r.matches);
+  const byId = new Map(all.map((m) => [m.id, m]));
+  const kids = (m) => m.feeders.map((id) => byId.get(id)).filter(Boolean);
+  const height = new Map(), centre = new Map();
+
+  const measure = (m) => {
+    const inner = kids(m).reduce((sum, k) => sum + measure(k), 0);
+    height.set(m.id, m.walkover ? inner : Math.max(1, inner));
+    return height.get(m.id);
+  };
+  const place = (m, top) => {
+    const inner = kids(m).reduce((sum, k) => sum + height.get(k.id), 0);
+    centre.set(m.id, top + height.get(m.id) / 2);
+    let y = top + (height.get(m.id) - inner) / 2;
+    for (const k of kids(m)) { place(k, y); y += height.get(k.id); }
+  };
+
+  // Start from the matches nothing else in this bracket is fed by (the final).
+  const fed = new Set(all.flatMap((m) => m.feeders));
+  let units = 0;
+  for (const root of all.filter((m) => !fed.has(m.id))) {
+    measure(root);
+    place(root, units);
+    units += height.get(root.id);
+  }
+  // A round made only of walkovers has nothing to show.
+  const rounds = sec.rounds.filter((r) => r.matches.some((m) => !m.walkover));
+  return { title: sec.title, rounds, centre, units: Math.max(units, 1), third: sec.third };
+}
+
+function section(sec, unit, champion) {
+  const height = sec.units * unit;
+  // The third place match hangs a little below the final.
+  const final = sec.rounds.at(-1).matches[0];
+  const third = sec.third && !sec.third.walkover
+    ? `<div class="third" style="top:${(sec.centre.get(final.id) * unit + rowh + GAP / 2 + Math.min(40, unit * 0.2)).toFixed(1)}px">
+        <span class="label">Third place</span>${matchBox(sec.third)}</div>` : "";
+  const rounds = sec.rounds.map((r, i) => `<div class="round">
       <div class="label">${esc(r.title)}</div>
-      <div class="list">${r.matches.map(matchBox).join("")}</div>
+      <div class="list">${r.matches.filter((m) => !m.walkover).map((m) =>
+        matchBox(m, `data-id="${m.id}" style="top:${(sec.centre.get(m.id) * unit - rowh - GAP / 2).toFixed(1)}px"`)).join("")}${
+        i === sec.rounds.length - 1 ? third : ""}</div>
     </div>`).join("");
   const champ = champion === undefined ? "" : `<div class="round champion">
-      <div class="label">Champion</div><div class="box"><span data-fit="line">${champion ? esc(champion) : "?"}</span></div></div>`;
-  return `<section class="section" style="flex:${Math.max(...sec.rounds.map((r) => r.matches.length)) + 1}">
+      <div class="label">&nbsp;</div>
+      <div class="list"><div class="label">Champion</div>
+        <div class="box"><span data-fit="line">${champion ? esc(champion) : "?"}</span></div></div></div>`;
+  return `<section class="section">
     ${sec.title ? `<div class="label">${esc(sec.title)}</div>` : ""}
-    <div class="rounds">${rounds}${champ}</div>
+    <div class="rounds" style="height:${(height + 30).toFixed(1)}px">${rounds}${champ}</div>
     <svg class="lines"></svg>
   </section>`;
 }
 
-// Elbow connectors from each match to the one its winner feeds.
+// Elbow connectors from each match to the one its winner plays in.
 // offsetLeft/Top are used so the maths ignores the canvas scaling.
 function drawLines() {
   for (const sec of main.querySelectorAll(".section")) {
@@ -99,17 +161,17 @@ function drawLines() {
       for (let n = el; n && n !== sec; n = n.offsetParent) { x += n.offsetLeft; y += n.offsetTop; }
       return { x, y, w: el.offsetWidth, h: el.offsetHeight };
     };
-    const cols = [...sec.querySelectorAll(".round:not(.champion)")].map((r) => [...r.querySelectorAll(".match")].map(pos));
+    const at = new Map([...sec.querySelectorAll(".match[data-id]")].map((el) => [el.dataset.id, pos(el)]));
     let d = "";
-    for (let c = 1; c < cols.length; c++) {
-      const prev = cols[c - 1], cur = cols[c];
-      cur.forEach((to, i) => {
-        const feeders = prev.length === cur.length * 2 ? [prev[2 * i], prev[2 * i + 1]]
-          : prev.length === cur.length ? [prev[i]] : [];
-        for (const from of feeders) {
-          const x1 = from.x + from.w, y1 = from.y + from.h / 2, y2 = to.y + to.h / 2, mid = (x1 + to.x) / 2;
-          d += `M${x1} ${y1}H${mid}V${y2}H${to.x}`;
-        }
+    for (const [id, to] of at) {
+      const feeders = matches.get(id)?.feeders.map((f) => at.get(f)) || [];
+      feeders.forEach((from, i) => {
+        if (!from) return;
+        // Two feeders meet in the middle; a lone feeder runs into its own row.
+        const lone = !feeders[1 - i];
+        const y2 = to.y + (lone ? (i ? rowh * 1.5 + GAP : rowh / 2) : to.h / 2);
+        const x1 = from.x + from.w, y1 = from.y + from.h / 2, mid = (x1 + to.x) / 2;
+        d += `M${x1} ${y1}H${mid}V${y2}H${to.x}`;
       });
     }
     sec.querySelector("svg").innerHTML = `<path d="${d}"/>`;
@@ -117,20 +179,25 @@ function drawLines() {
 }
 
 function elimination(b) {
-  const built = buildElimination(b.format, b.entrants || [], b.results || {});
-  const last = built.sections[0].rounds.at(-1).matches[0];
-  // Each bracket gets height in proportion to its tallest round (see section()).
-  const tallest = built.sections.map((s) => Math.max(...s.rounds.map((r) => r.matches.length)));
-  const total = tallest.reduce((sum, n) => sum + n + 1, 0);
-  const perMatch = Math.min(...tallest.map((n) => (main.clientHeight * (n + 1) / total - 60) / n));
-  main.style.setProperty("--rowh", `${Math.max(14, Math.min(46, Math.floor((perMatch - 12) / 2)))}px`);
-  return built.sections.map((s, i) => section(s, i === 0 ? (last.won ? last.winner.name : "") : undefined)).join("");
+  const built = buildElimination(b.format, b.entrants || [], b.results || {}, { thirdPlace: hasThirdPlace(b) });
+  const sections = built.sections.map(layout);
+  matches = new Map(built.sections.flatMap((s) => s.rounds.flatMap((r) => r.matches)).map((m) => [m.id, m]));
+  const final = built.sections[0].rounds.at(-1).matches[0];
+
+  // Share the height between the brackets, one unit per match in the busiest round.
+  const fixed = sections.reduce((sum, s) => sum + 30 + (s.title ? 26 : 0), 0) + 14 * (sections.length - 1);
+  const unit = Math.min(190, (main.clientHeight - fixed) / sections.reduce((sum, s) => sum + s.units, 0));
+  rowh = Math.max(12, Math.min(46, Math.floor((unit - 10 - GAP) / 2)));
+  main.style.setProperty("--rowh", `${rowh}px`);
+  main.style.setProperty("--gap", sections[0].rounds.length > 4 ? "40px" : "56px");
+  return sections.map((s, i) => section(s, unit, i === 0 ? (final.won ? final.winner.name : "") : undefined)).join("");
 }
 
 function swiss(b) {
   const entrants = b.entrants || [], rounds = b.swissRounds || [];
   const table = swissStandings(entrants, rounds);
-  main.style.setProperty("--rowh", `${Math.max(20, Math.min(46, Math.floor(500 / Math.max(table.length, 1)) - 6))}px`);
+  rowh = Math.max(20, Math.min(46, Math.floor(500 / Math.max(table.length, 1)) - 6));
+  main.style.setProperty("--rowh", `${rowh}px`);
   const rows = table.map((p, i) => `<div class="line">
       <span class="rank">${i + 1}</span><span>${esc(p.name)}</span>
       <span class="rec">${p.wins} - ${p.losses}</span><span class="diff">${p.diff > 0 ? "+" : ""}${p.diff}</span></div>`).join("");

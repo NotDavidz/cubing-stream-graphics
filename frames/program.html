@@ -5,34 +5,113 @@
 <title>Program (operator-switched)</title>
 <style>
   html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: transparent; }
-  iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; transition: opacity .3s; }
+  iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
   iframe.out { opacity: 0; }
+  iframe.fade { transition: opacity .35s ease; }
+
+  /* The sweep: a slanted dark panel with the club stripes on both edges. It
+     slides in from the left until it hides the picture, the page behind it
+     is swapped, and it carries on out to the right. */
+  #sweep {
+    position: fixed; top: -10vh; left: -30vw; width: 160vw; height: 120vh; z-index: 5;
+    transform: translateX(-175vw) skewX(-18deg);
+    background:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='170' height='270'%3E%3Cpath d='M12 10h56l-28 50z M97 195h56l-28-50z' fill='%232a2a2a'/%3E%3C/svg%3E"),
+      linear-gradient(90deg, #eae6a3 0 1.2%, #ecc13c 1.2% 4%, #1b1b1b 4% 96%, #ecc13c 96% 98.8%, #fae203 98.8% 100%);
+    pointer-events: none;
+  }
+  #logo {
+    position: fixed; left: 50%; top: 50%; height: 34vh; z-index: 6;
+    transform: translate(-50%, -50%); opacity: 0; pointer-events: none;
+  }
 </style>
 </head>
 <body>
+<div id="sweep"></div>
+<img id="logo" src="../assets/logo.png" alt="">
 <script type="module">
 // One source that shows whichever frame the operator picks in the control
 // panel ("On screen now"). Add this once in OBS, or open it full-screen on
 // the projector, and switch pages without touching OBS or the projector.
+//
+// How the change looks is chosen under Settings (state.settings.transition):
+//   "sweep"  a slanted panel wipes across and the new page is behind it
+//   "fade"   the pages cross-fade
+//   "cut"    instant
 import { store } from "../shared/store.js";
+import { SCENES, DEFAULT_SCENE } from "../shared/scenes.js";
 
-const SCENES = ["versus", "pickban", "bracket", "competitor", "team", "intermission", "cam-versus", "cam-solo", "scorebug"];
-let showing = "";
+const still = new URLSearchParams(location.search).has("still");
+const sweep = document.querySelector("#sweep");
+const logo = document.querySelector("#logo");
+const wait = (ms) => new Promise((done) => setTimeout(done, ms));
+
+let wanted = "";                     // the scene the operator asked for
+let current = null;                  // the iframe on screen
+let queue = Promise.resolve();       // changes happen one after another
+
+// Play an animation and wait for it. The timer is a safety net: a browser
+// may pause animations in a hidden tab, and the swap must still happen.
+function play(el, frames, duration, easing = "cubic-bezier(.65, 0, .35, 1)") {
+  const anim = el.animate(frames, { duration, easing, fill: "forwards" });
+  return Promise.race([anim.finished, wait(duration + 150)]);
+}
+
+// Load a scene behind everything else; resolves when it is ready to show.
+function load(scene) {
+  const frame = document.createElement("iframe");
+  frame.className = "out";
+  frame.src = `${scene}.html${location.search}`;
+  document.body.prepend(frame);
+  const loaded = new Promise((done) => { frame.onload = done; });
+  return Promise.race([loaded, wait(4000)]).then(() => wait(60)).then(() => frame);
+}
+
+function show(frame) {
+  current?.remove();
+  frame.classList.remove("out", "fade");
+  current = frame;
+}
+
+const slide = (x) => ({ transform: `translateX(${x}vw) skewX(-18deg)` });
+
+const TRANSITIONS = {
+  async cut(scene) {
+    show(await load(scene));
+  },
+  async fade(scene) {
+    const next = await load(scene);
+    const old = current;
+    next.classList.add("fade");
+    old?.classList.add("fade");
+    await wait(20);                  // let the browser see the starting opacity
+    next.classList.remove("out");
+    old?.classList.add("out");
+    await wait(370);
+    show(next);
+  },
+  async sweep(scene) {
+    await play(sweep, [slide(-175), slide(0)], 430);
+    play(logo, [{ opacity: 0, transform: "translate(-50%, -50%) scale(.8)" }, { opacity: 1, transform: "translate(-50%, -50%) scale(1)" }], 180, "ease-out");
+    const [next] = await Promise.all([load(scene), wait(260)]);
+    show(next);
+    play(logo, [{ opacity: 1 }, { opacity: 0 }], 160, "ease-in");
+    await play(sweep, [slide(0), slide(175)], 430);
+  },
+};
+
+async function change(scene, style) {
+  if (scene !== wanted) return;      // the operator has already moved on
+  await (TRANSITIONS[style] || TRANSITIONS.sweep)(scene);
+}
 
 store.subscribe((state) => {
-  const scene = SCENES.includes(state.program?.scene) ? state.program.scene : "intermission";
-  if (scene === showing) return;
-  showing = scene;
-  const next = document.createElement("iframe");
-  next.className = "out";
-  next.src = `${scene}.html${location.search}`;
-  next.onload = () => {
-    next.classList.remove("out");
-    for (const old of document.querySelectorAll("iframe")) {
-      if (old !== next) { old.classList.add("out"); setTimeout(() => old.remove(), 350); }
-    }
-  };
-  document.body.append(next);
+  const asked = state.program?.scene;
+  const scene = SCENES.some((s) => s.id === asked) ? asked : DEFAULT_SCENE;
+  if (scene === wanted) return;
+  const style = !wanted || still ? "cut" : state.settings?.transition || "sweep";
+  wanted = scene;
+  queue = queue.then(() => change(scene, style)).catch(console.error);
 });
 </script>
 </body>
